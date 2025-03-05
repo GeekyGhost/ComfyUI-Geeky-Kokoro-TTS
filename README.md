@@ -2,6 +2,9 @@
 
 A powerful and feature-rich custom node collection for ComfyUI that integrates the Kokoro TTS (Text-to-Speech) system with advanced voice modification capabilities. This package allows you to generate natural-sounding speech and apply various voice effects within ComfyUI workflows.
 
+<img width="460" alt="Screenshot 2025-03-05 151117" src="https://github.com/user-attachments/assets/0033cc71-40f1-44c3-b668-94f87d7eab9a" />
+
+
 ## ✨ Features
 
 ### Geeky Kokoro TTS Node
