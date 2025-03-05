@@ -1,0 +1,9 @@
+kokoro>=0.8.4
+soundfile>=0.12.1
+numpy>=1.22.0
+torch>=2.0.0
+tqdm>=4.64.0
+einops>=0.6.0
+librosa>=0.10.0
+scipy>=1.9.0
+resampy>=0.4.3
