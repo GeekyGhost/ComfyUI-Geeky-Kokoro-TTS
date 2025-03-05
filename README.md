@@ -35,7 +35,7 @@ A powerful and feature-rich custom node collection for ComfyUI that integrates t
 1. Clone this repository into your ComfyUI custom_nodes directory:
 ```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/yourusername/geeky-kokoro-tts.git geeky_kokoro_tts
+git clone https://github.com/GeekyGhost/ComfyUI-Geeky-Kokoro-TTS.git
 ```
 
 2. Run the installer script:
