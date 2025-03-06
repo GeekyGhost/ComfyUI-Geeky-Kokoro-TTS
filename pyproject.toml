@@ -1,0 +1,15 @@
+[project]
+name = "geeky-kokoro-tts"
+description = "A powerful and feature-rich custom node collection for ComfyUI that integrates the Kokoro TTS (Text-to-Speech) system with advanced voice modification capabilities. This package allows you to generate natural-sounding speech and apply various voice effects within ComfyUI workflows."
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["kokoro>=0.8.4", "soundfile>=0.12.1", "numpy>=1.22.0", "torch>=2.0.0", "tqdm>=4.64.0", "einops>=0.6.0", "librosa>=0.10.0", "scipy>=1.9.0", "resampy>=0.4.3"]
+
+[project.urls]
+Repository = "https://github.com/GeekyGhost/ComfyUI-Geeky-Kokoro-TTS"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-Geeky-Kokoro-TTS"
+Icon = ""
