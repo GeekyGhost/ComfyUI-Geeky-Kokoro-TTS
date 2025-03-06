@@ -10,6 +10,6 @@ Repository = "https://github.com/GeekyGhost/ComfyUI-Geeky-Kokoro-TTS"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "Geeky Ghost"
 DisplayName = "ComfyUI-Geeky-Kokoro-TTS"
-Icon = ""
+Icon = "🔊"
