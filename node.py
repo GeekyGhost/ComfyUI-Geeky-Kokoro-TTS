@@ -64,7 +64,7 @@ class GeekyKokoroTTSNode:
         for code in ['a', 'b']:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                cls.PIPELINES[code] = KPipeline(lang_code=code, model=False)
+                cls.PIPELINES[code] = KPipeline(lang_code=code, model=False, repo_id='hexgrad/Kokoro-82M')
         
         cls.PIPELINES['a'].g2p.lexicon.golds['kokoro'] = 'kˈOkəɹO'
         cls.PIPELINES['b'].g2p.lexicon.golds['kokoro'] = 'kˈQkəɹQ'
@@ -77,7 +77,7 @@ class GeekyKokoroTTSNode:
                 cls.MODEL = {}
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
-                    cls.MODEL[False] = KModel().to('cpu').eval()
+                    cls.MODEL[False] = KModel(repo_id='hexgrad/Kokoro-82M').to('cpu').eval()
                 if torch.cuda.is_available():
                     print("CUDA available. GPU model on demand.")
         print("Initialization complete.")
