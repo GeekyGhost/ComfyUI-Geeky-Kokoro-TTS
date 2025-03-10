@@ -99,7 +99,8 @@ class GeekyKokoroAdvancedVoiceNode:
                 
                 # Character Effects
                 "character_effect": (["None", "Robot", "Telephone", "Megaphone", "Radio", "Underwater", 
-                                      "Cosmic", "Whisper", "ASMR", "Demon", "Angel", "Alien", "8-bit Game"], 
+                                      "Cosmic", "Whisper", "ASMR", "Demon", "Angel", "Alien", "8-bit Game",
+                                      "Darth Vader"], 
                                      {"default": "None"}),
                 "character_intensity": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01, "display": "slider"}),
                 
@@ -107,7 +108,7 @@ class GeekyKokoroAdvancedVoiceNode:
                 "preset": (["None", "Chipmunk", "Deep Voice", "Helium", "Phone Call", "Child Voice", 
                             "Elder Voice", "Robot Voice", "Ethereal", "Monster", "Ghost", "Fantasy Elf", 
                             "Dwarf", "Orc", "Celestial", "Demonic", "Radio Host", "Podcast", "Movie Trailer", 
-                            "Storyteller", "Singer"], 
+                            "Storyteller", "Singer", "Darth Vader", "Underwater", "TV Announcer"], 
                            {"default": "None"}),
                 "preset_strength": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01, "display": "slider"}),
             }
@@ -118,7 +119,82 @@ class GeekyKokoroAdvancedVoiceNode:
     FUNCTION = "process_voice"
     CATEGORY = "audio"
     
+    # Debug helper function
+    def debug_audio_stats(self, audio, name="audio"):
+        """Debug helper to print audio statistics"""
+        try:
+            min_val = np.min(audio)
+            max_val = np.max(audio)
+            mean_val = np.mean(audio)
+            rms = np.sqrt(np.mean(audio**2))
+            has_nan = np.any(np.isnan(audio))
+            has_inf = np.any(np.isinf(audio))
+            
+            print(f"Audio '{name}' stats:")
+            print(f"  Shape: {audio.shape}")
+            print(f"  Min: {min_val}, Max: {max_val}, Mean: {mean_val}, RMS: {rms}")
+            print(f"  Contains NaN: {has_nan}, Contains Inf: {has_inf}")
+            
+            if has_nan or has_inf or max_val > 10.0 or min_val < -10.0:
+                print(f"  WARNING: Problematic values detected in {name}")
+                
+            return not (has_nan or has_inf)
+        except Exception as e:
+            print(f"Debug error: {e}")
+            return False
+    
     # ============ PITCH AND FORMANT PROCESSING ============
+    
+    @staticmethod
+    def _improved_speed_change(audio, speed_factor):
+        """More reliable speed change implementation"""
+        if abs(speed_factor - 1.0) < 0.01:
+            return audio
+            
+        try:
+            # Create an array of indices, spaced by speed_factor
+            indices = np.round(np.arange(0, len(audio), speed_factor))
+            # Only use indices that are within the audio array
+            valid_indices = indices[indices < len(audio)].astype(int)
+            
+            # If we have no valid indices, return the original
+            if len(valid_indices) == 0:
+                return audio
+                
+            # Get the audio at those indices
+            speed_changed = audio[valid_indices]
+            
+            return speed_changed
+        except Exception as e:
+            print(f"Speed change error: {e}")
+            return audio
+    
+    @staticmethod
+    def _improved_simple_pitch_shift(audio, sr, n_steps, bins_per_octave=12):
+        """More reliable pitch shifting using time domain effects"""
+        if abs(n_steps) < 0.1:
+            return audio
+            
+        try:
+            # Convert steps to rate
+            rate = 2.0 ** (-n_steps / bins_per_octave)
+            
+            # Change speed (which changes pitch)
+            changed = GeekyKokoroAdvancedVoiceNode._improved_speed_change(audio, 1.0/rate)
+            
+            # Resample to original length
+            output_length = len(audio)
+            if len(changed) == 0:
+                return audio
+                
+            # Use linear interpolation to resample
+            indices = np.linspace(0, len(changed) - 1, output_length)
+            resampled = np.interp(indices, np.arange(len(changed)), changed)
+            
+            return resampled
+        except Exception as e:
+            print(f"Simple pitch shift error: {e}")
+            return audio
     
     @staticmethod
     def _apply_pitch_shift(audio, sr, n_steps, quality='high'):
@@ -167,6 +243,13 @@ class GeekyKokoroAdvancedVoiceNode:
                 except Exception as e:
                     print(f"STFT phase vocoder pitch shift error: {e}")
                     # Continue to simplest fallback
+            
+            # Try our improved simple pitch shifter
+            try:
+                return GeekyKokoroAdvancedVoiceNode._improved_simple_pitch_shift(audio, sr, n_steps)
+            except Exception as e:
+                print(f"Improved simple pitch shift error: {e}")
+                # Continue to original fallback
             
             # Simplest fallback using basic resampling
             if FALLBACKS_AVAILABLE:
@@ -245,6 +328,32 @@ class GeekyKokoroAdvancedVoiceNode:
                 except Exception as e:
                     print(f"Basic formant shift error: {e}")
                     return audio
+            
+            # If all else fails, try a simplified approach
+            # Simple approach: use pitch shift then inverse pitch shift with time stretching
+            try:
+                # Pitch shift without preserving duration
+                audio_copy = audio.copy()
+                shifted = GeekyKokoroAdvancedVoiceNode._improved_simple_pitch_shift(
+                    audio_copy, sr, shift_amount * 3
+                )
+                
+                # Apply time stretch to compensate
+                time_stretched = GeekyKokoroAdvancedVoiceNode._improved_speed_change(
+                    shifted, 2 ** (shift_amount * 3 / 12)
+                )
+                
+                # Resample to original length
+                if len(time_stretched) == 0:
+                    return audio_copy
+                    
+                indices = np.linspace(0, len(time_stretched) - 1, len(audio))
+                result = np.interp(indices, np.arange(len(time_stretched)), time_stretched)
+                
+                return result
+            except Exception as e:
+                print(f"Simplified formant shift fallback error: {e}")
+                return audio
             
             # If all else fails
             print("No formant shifting implementations available")
@@ -353,7 +462,20 @@ class GeekyKokoroAdvancedVoiceNode:
                                     shifted_segment = GeekyKokoroAdvancedVoiceNode._apply_pitch_shift(
                                         segment, sr, shift_amount
                                     )
-                                    output[start:end] = shifted_segment
+                                    
+                                    # Check for NaN or Inf values
+                                    if np.any(np.isnan(shifted_segment)) or np.any(np.isinf(shifted_segment)):
+                                        output[start:end] = audio[start:end]
+                                    else:
+                                        # Ensure length matches
+                                        if len(shifted_segment) > len(segment):
+                                            shifted_segment = shifted_segment[:len(segment)]
+                                        elif len(shifted_segment) < len(segment):
+                                            shifted_segment = np.pad(shifted_segment, 
+                                                                   (0, len(segment) - len(shifted_segment)), 
+                                                                   mode='constant')
+                                        
+                                        output[start:end] = shifted_segment
                                 except Exception:
                                     output[start:end] = audio[start:end]
                             else:
@@ -402,8 +524,24 @@ class GeekyKokoroAdvancedVoiceNode:
                     print(f"Librosa time stretch error: {e}")
                     # Continue to fallbacks
             
-            # Fallback implementation using resampling
-            # We'll use a simple method that works with just NumPy
+            # Fallback implementation using our improved method
+            try:
+                # Stretch the audio using our speed change function
+                stretched = GeekyKokoroAdvancedVoiceNode._improved_speed_change(audio, 1.0/rate)
+                
+                # Resample back to original length
+                if len(stretched) == 0:
+                    return audio
+                
+                indices = np.linspace(0, len(stretched) - 1, len(audio))
+                result = np.interp(indices, np.arange(len(stretched)), stretched)
+                
+                return result
+            except Exception as e:
+                print(f"Improved time stretch error: {e}")
+                # Continue to original fallback
+            
+            # Original fallback implementation using resampling
             indices = np.arange(0, len(audio), rate)
             indices = indices[indices < len(audio)]
             stretched = np.interp(indices, np.arange(len(audio)), audio)
@@ -463,9 +601,9 @@ class GeekyKokoroAdvancedVoiceNode:
                     result[start:end] = segment
                     continue
                     
-                # Apply pitch shift to this segment
+                # Apply pitch shift to this segment using our reliable method
                 try:
-                    shifted_segment = GeekyKokoroAdvancedVoiceNode._apply_pitch_shift(
+                    shifted_segment = GeekyKokoroAdvancedVoiceNode._improved_simple_pitch_shift(
                         segment, sr, shift_amount
                     )
                     
@@ -494,7 +632,7 @@ class GeekyKokoroAdvancedVoiceNode:
     
     @staticmethod
     def _apply_reverb(audio, sr, amount, room_size=0.5, damping=0.5):
-        """Enhanced reverb with room size and damping controls"""
+        """Enhanced reverb with room size and damping controls using filtfilt"""
         if amount < 0.01:
             return audio
             
@@ -524,7 +662,7 @@ class GeekyKokoroAdvancedVoiceNode:
             # Apply the reverb using convolution
             if SCIPY_AVAILABLE:
                 try:
-                    reverb_signal = signal.convolve(audio, impulse, mode='full')[:len(audio)]
+                    reverb_signal = signal.fftconvolve(audio, impulse, mode='full')[:len(audio)]
                 except Exception as e:
                     print(f"Reverb convolution error: {e}")
                     # Fallback method
@@ -553,7 +691,7 @@ class GeekyKokoroAdvancedVoiceNode:
     
     @staticmethod
     def _apply_echo(audio, sr, amount, feedback=0.3):
-        """Add echo effect with feedback control"""
+        """Add echo effect with feedback control - simplified implementation"""
         if amount < 0.01:
             return audio
             
@@ -562,40 +700,38 @@ class GeekyKokoroAdvancedVoiceNode:
             delay_time = 0.1 + amount * 0.4  # 0.1s to 0.5s
             delay_samples = int(sr * delay_time)
             
-            # Create the delayed signal
-            delayed = np.zeros_like(audio)
-            delayed[delay_samples:] = audio[:-delay_samples]
+            # Ensure delay is smaller than the audio length
+            if delay_samples >= len(audio):
+                delay_samples = len(audio) // 2
+                if delay_samples == 0:
+                    return audio
             
-            # Apply feedback
-            result = audio.copy()
+            # Create output buffer
+            output = np.zeros_like(audio, dtype=np.float32)
             
-            # Apply multiple echo taps with decreasing volume
-            echo_signal = delayed * amount
-            result += echo_signal
+            # Copy original signal
+            output[:] = audio[:]
             
-            # Add feedback delays
-            for i in range(1, 5):  # Up to 5 feedback taps
-                tap_gain = amount * (feedback ** i)
-                if tap_gain < 0.01:
-                    break
+            # Apply the echo (directly using array operations)
+            output[delay_samples:] += audio[:-delay_samples] * amount
+            
+            # Add feedback echoes
+            if feedback > 0.01:
+                for i in range(1, 3):  # Limit to 2 feedback echoes for reliability
+                    tap_delay = delay_samples * (i + 1)
+                    tap_gain = amount * (feedback ** i)
                     
-                # Shift the echo further in time
-                tap_delay = delay_samples * i
-                if tap_delay >= len(audio):
-                    break
-                    
-                tap_signal = np.zeros_like(audio)
-                tap_signal[tap_delay:] = audio[:-tap_delay]
-                
-                # Add this tap to the result
-                result += tap_signal * tap_gain
+                    if tap_delay >= len(audio) or tap_gain < 0.01:
+                        break
+                        
+                    output[tap_delay:] += audio[:-tap_delay] * tap_gain
             
-            # Prevent clipping
-            max_val = np.max(np.abs(result))
+            # Normalize to prevent clipping
+            max_val = np.max(np.abs(output))
             if max_val > 1.0:
-                result /= max_val
+                output = output / max_val
                 
-            return result
+            return output
         except Exception as e:
             print(f"Echo effect error: {e}")
             return audio
@@ -604,7 +740,7 @@ class GeekyKokoroAdvancedVoiceNode:
     
     @staticmethod
     def _apply_eq(audio, sr, bass=0.0, mid=0.0, treble=0.0):
-        """Apply 3-band equalizer with bass, mid, and treble controls"""
+        """Apply 3-band equalizer with bass, mid, and treble controls using filtfilt"""
         if abs(bass) < 0.01 and abs(mid) < 0.01 and abs(treble) < 0.01:
             return audio
             
@@ -627,10 +763,10 @@ class GeekyKokoroAdvancedVoiceNode:
                     mid_low_norm = mid_high_norm * 0.5
                 
                 # Process the audio in three bands
-                # Low-pass for bass
+                # Low-pass for bass - Use a lower order for more stability
                 try:
                     b_bass, a_bass = signal.butter(2, bass_norm, btype='low')
-                    bass_filtered = signal.lfilter(b_bass, a_bass, audio)
+                    bass_filtered = signal.filtfilt(b_bass, a_bass, audio)
                 except Exception as e:
                     print(f"Bass filter error: {e}")
                     bass_filtered = audio
@@ -638,7 +774,7 @@ class GeekyKokoroAdvancedVoiceNode:
                 # Band-pass for mids
                 try:
                     b_mid, a_mid = signal.butter(2, [mid_low_norm, mid_high_norm], btype='band')
-                    mid_filtered = signal.lfilter(b_mid, a_mid, audio)
+                    mid_filtered = signal.filtfilt(b_mid, a_mid, audio)
                 except Exception as e:
                     print(f"Mid filter error: {e}")
                     mid_filtered = audio
@@ -646,7 +782,7 @@ class GeekyKokoroAdvancedVoiceNode:
                 # High-pass for treble
                 try:
                     b_treble, a_treble = signal.butter(2, treble_norm, btype='high')
-                    treble_filtered = signal.lfilter(b_treble, a_treble, audio)
+                    treble_filtered = signal.filtfilt(b_treble, a_treble, audio)
                 except Exception as e:
                     print(f"Treble filter error: {e}")
                     treble_filtered = audio
@@ -661,6 +797,11 @@ class GeekyKokoroAdvancedVoiceNode:
                 result = (bass_filtered * bass_gain + 
                          mid_filtered * mid_gain + 
                          treble_filtered * treble_gain) / 3
+                
+                # Check for NaN or inf values
+                if np.any(np.isnan(result)) or np.any(np.isinf(result)):
+                    print("Warning: EQ produced NaN or inf values, returning original audio")
+                    return audio
                 
                 return result
             else:
@@ -741,48 +882,23 @@ class GeekyKokoroAdvancedVoiceNode:
     
     @staticmethod
     def _apply_distortion(audio, effect_strength):
-        """Improved distortion with smoother curve"""
+        """Simplified and more reliable distortion"""
         if effect_strength < 0.01:
             return audio
             
         try:
-            # Create a more musical distortion curve
-            # Mix between different distortion types
-            drive = 1 + effect_strength * 15  # 1 to 16
+            # Create a simpler distortion using tanh
+            drive = 1 + effect_strength * 10  # 1 to 11
+            distorted = np.tanh(audio * drive) / np.tanh(drive)
             
-            # Soft clipping (tanh)
-            soft_clip = np.tanh(audio * drive)
+            # Mix with original
+            result = audio * (1 - effect_strength) + distorted * effect_strength
             
-            # Hard clipping
-            threshold = 1 / drive
-            hard_clip = np.clip(audio * drive, -threshold, threshold)
-            
-            # Tube-like asymmetric distortion
-            tube_clip = np.copy(audio)
-            positive_mask = tube_clip > 0
-            tube_clip[positive_mask] = 1.0 - np.exp(-tube_clip[positive_mask] * drive)
-            tube_clip[~positive_mask] = -1.0 + np.exp(tube_clip[~positive_mask] * drive)
-            
-            # Mix the distortion types based on intensity
-            if effect_strength < 0.3:
-                # Subtle distortion - mostly soft clip
-                dist_mix = soft_clip
-            elif effect_strength < 0.7:
-                # Medium distortion - mix of soft and tube
-                mix_ratio = (effect_strength - 0.3) / 0.4
-                dist_mix = soft_clip * (1 - mix_ratio) + tube_clip * mix_ratio
-            else:
-                # Heavy distortion - mix in some hard clipping
-                mix_ratio = (effect_strength - 0.7) / 0.3
-                dist_mix = tube_clip * (1 - mix_ratio) + hard_clip * mix_ratio
-            
-            # Normalize the output
-            if np.max(np.abs(dist_mix)) > 0:
-                dist_mix = dist_mix / np.max(np.abs(dist_mix)) * 0.95
+            # Normalize output
+            max_val = np.max(np.abs(result))
+            if max_val > 0.95:
+                result = result / max_val * 0.95
                 
-            # Mix with original for smoother transition
-            result = audio * (1 - effect_strength) + dist_mix * effect_strength
-            
             return result
         except Exception as e:
             print(f"Distortion error: {e}")
@@ -843,54 +959,6 @@ class GeekyKokoroAdvancedVoiceNode:
             return audio
             
         try:
-            # Check if we have librosa for spectral processing
-            if LIBROSA_AVAILABLE:
-                try:
-                    # Simple spectral gating noise reduction
-                    # Convert to spectrum
-                    S = librosa.stft(audio)
-                    S_mag, S_phase = librosa.magphase(S)
-                    
-                    # Estimate noise floor
-                    # Assume the quietest 5% of the spectrum is noise
-                    mag_db = librosa.amplitude_to_db(S_mag)
-                    noise_threshold_db = np.percentile(mag_db, 5)
-                    
-                    # Set threshold based on amount
-                    threshold_db = noise_threshold_db + 20 * (1 - amount)  # Lower the threshold as amount increases
-                    
-                    # Apply spectral gating
-                    mask = mag_db > threshold_db
-                    
-                    # Smooth the mask to prevent musical noise
-                    mask_smooth = np.zeros_like(mask, dtype=float)
-                    for i in range(mask.shape[1]):
-                        if SCIPY_AVAILABLE:
-                            try:
-                                mask_smooth[:, i] = signal.medfilt(mask[:, i].astype(float), 3)
-                            except Exception:
-                                mask_smooth[:, i] = mask[:, i].astype(float)
-                        else:
-                            mask_smooth[:, i] = mask[:, i].astype(float)
-                        
-                    # Create soft mask
-                    gain_db = (mag_db - threshold_db)
-                    gain_db = np.maximum(-80, gain_db)  # Limit to -80dB
-                    gain_db = gain_db * amount  # Apply amount
-                    gain_linear = librosa.db_to_amplitude(gain_db)
-                    
-                    # Apply the soft mask
-                    S_mag_clean = S_mag * gain_linear
-                    
-                    # Reconstruct the audio
-                    S_clean = S_mag_clean * S_phase
-                    audio_clean = librosa.istft(S_clean, length=len(audio))
-                    
-                    return audio_clean
-                except Exception as e:
-                    print(f"Spectral processing error: {e}")
-                    # Fall back to simple envelope-based noise reduction
-            
             # Simple envelope-based noise reduction as fallback
             # Calculate signal envelope
             abs_audio = np.abs(audio)
@@ -1039,13 +1107,13 @@ class GeekyKokoroAdvancedVoiceNode:
             # Add subtle low-frequency enhancement using a basic low-pass filter
             if SCIPY_AVAILABLE:
                 try:
-                    # Low shelf EQ boost for warmth using normal filter
+                    # Low shelf EQ boost for warmth
                     nyquist = sr / 2
                     low_freq = min(200 / nyquist, 0.9)  # Ensure it's < 1.0
                     
-                    # Apply standard lowpass filter with boost
+                    # Apply lowpass filter with boost using filtfilt
                     b, a = signal.butter(2, low_freq, btype='low')
-                    low_end = signal.lfilter(b, a, warmth)
+                    low_end = signal.filtfilt(b, a, warmth)
                     
                     # Mix boosted low end with original
                     boost_amount = 0.2 * amount
@@ -1078,8 +1146,154 @@ class GeekyKokoroAdvancedVoiceNode:
     # ============ CHARACTER EFFECTS ============
     
     @staticmethod
+    def _apply_robot(audio, sr, intensity=0.7):
+        """More reliable robot voice effect"""
+        try:
+            # Apply bandpass filter for robotic sound
+            filtered = np.zeros_like(audio)
+            
+            if SCIPY_AVAILABLE:
+                try:
+                    nyquist = sr / 2
+                    low_freq = 500 / nyquist
+                    high_freq = 2000 / nyquist
+                    
+                    # Ensure frequencies are normalized correctly
+                    low_freq = min(max(low_freq, 0.01), 0.99)
+                    high_freq = min(max(high_freq, 0.01), 0.99)
+                    
+                    # Make sure low_freq < high_freq
+                    if low_freq >= high_freq:
+                        low_freq = high_freq * 0.5
+                    
+                    b, a = signal.butter(2, [low_freq, high_freq], btype='band')
+                    filtered = signal.filtfilt(b, a, audio)
+                except Exception as e:
+                    print(f"Robot filter error: {e}")
+                    # Fall back to FFT filtering
+                    filtered = audio
+            
+            # Add amplitude modulation for robotic buzz
+            t = np.arange(len(audio)) / sr
+            buzz_freq = 50  # Hz
+            buzz_depth = 0.3 * intensity
+            buzz = 1.0 - buzz_depth + buzz_depth * np.sin(2 * np.pi * buzz_freq * t)
+            
+            robot = filtered * buzz
+            
+            # Add subtle distortion
+            robot = np.tanh(robot * 1.2) / 1.2
+            
+            return robot
+        except Exception as e:
+            print(f"Robot effect error: {e}")
+            return audio
+    
+    @staticmethod
+    def _apply_telephone(audio, sr, intensity=0.7):
+        """More reliable telephone effect"""
+        try:
+            # Apply bandpass filter for telephone frequency response
+            filtered = np.zeros_like(audio)
+            
+            if SCIPY_AVAILABLE:
+                try:
+                    nyquist = sr / 2
+                    low_freq = 300 / nyquist
+                    high_freq = 3400 / nyquist
+                    
+                    # Ensure frequencies are normalized correctly
+                    low_freq = min(max(low_freq, 0.01), 0.99)
+                    high_freq = min(max(high_freq, 0.01), 0.99)
+                    
+                    # Make sure low_freq < high_freq
+                    if low_freq >= high_freq:
+                        low_freq = high_freq * 0.5
+                    
+                    b, a = signal.butter(2, [low_freq, high_freq], btype='band')
+                    filtered = signal.filtfilt(b, a, audio)
+                except Exception as e:
+                    print(f"Telephone filter error: {e}")
+                    # Fall back to original audio
+                    filtered = audio
+            
+            # Add mild distortion
+            distorted = np.tanh(filtered * 1.5) / 1.5
+            
+            # Add telephone line noise
+            noise_level = 0.01 * intensity
+            noise = np.random.normal(0, noise_level, len(distorted))
+            
+            result = distorted + noise
+            
+            # Normalize
+            max_val = np.max(np.abs(result))
+            if max_val > 0.95:
+                result = result / max_val * 0.95
+            
+            return result
+        except Exception as e:
+            print(f"Telephone effect error: {e}")
+            return audio
+    
+    @staticmethod
+    def _apply_darth_vader(audio, sr, intensity=0.7):
+        """Darth Vader voice effect"""
+        try:
+            # Slow down the audio (pitch drops)
+            slowed = GeekyKokoroAdvancedVoiceNode._improved_speed_change(audio, 1.25)
+            
+            # Resample to original length (maintain pitch change)
+            indices = np.linspace(0, len(slowed) - 1, len(audio))
+            if len(slowed) > 0:
+                resampled = np.interp(indices, np.arange(len(slowed)), slowed)
+            else:
+                resampled = audio
+                
+            # Apply lowpass filter
+            filtered = np.zeros_like(resampled)
+            
+            if SCIPY_AVAILABLE:
+                try:
+                    nyquist = sr / 2
+                    cutoff = 2500 / nyquist
+                    cutoff = min(max(cutoff, 0.01), 0.99)
+                    
+                    b, a = signal.butter(2, cutoff, btype='low')
+                    filtered = signal.filtfilt(b, a, resampled)
+                except Exception as e:
+                    print(f"Vader filter error: {e}")
+                    filtered = resampled
+            else:
+                filtered = resampled
+            
+            # Add echo
+            echo = GeekyKokoroAdvancedVoiceNode._apply_echo(filtered, sr, 0.2 * intensity, 0.3)
+            
+            # Add slight distortion
+            distorted = GeekyKokoroAdvancedVoiceNode._apply_distortion(echo, 0.2 * intensity)
+            
+            # Add breathing effect (subtle)
+            t = np.arange(len(distorted)) / sr
+            breath_rate = 0.4  # breaths per second
+            breath_depth = 0.1 * intensity
+            breath = 1.0 - breath_depth + breath_depth * np.sin(2 * np.pi * breath_rate * t)
+            
+            result = distorted * breath
+            
+            # Normalize
+            max_val = np.max(np.abs(result))
+            if max_val > 0.95:
+                result = result / max_val * 0.95
+                
+            return result
+        except Exception as e:
+            print(f"Darth Vader effect error: {e}")
+            return audio
+    
+    @staticmethod
     def _apply_character_effect(audio, sr, effect_name, intensity):
-        """Apply special vocal character effects with fallbacks"""
+        """Apply special vocal character effects with improved implementations"""
         if effect_name == "None" or intensity < 0.01:
             return audio
             
@@ -1087,113 +1301,24 @@ class GeekyKokoroAdvancedVoiceNode:
             result = audio.copy()
             
             if effect_name == "Robot":
-                # Robot voice effect - simplified implementation
-                # Apply a bandpass filter for a "robotic" sound
-                if SCIPY_AVAILABLE:
-                    try:
-                        nyquist = sr / 2
-                        low_freq = 500 / nyquist
-                        high_freq = 2000 / nyquist
-                        
-                        # Ensure frequencies are normalized correctly
-                        low_freq = min(max(low_freq, 0.01), 0.99)
-                        high_freq = min(max(high_freq, 0.01), 0.99)
-                        
-                        # Make sure low_freq < high_freq
-                        if low_freq >= high_freq:
-                            low_freq = high_freq * 0.5
-                        
-                        b, a = signal.butter(4, [low_freq, high_freq], btype='band')
-                        robot = signal.lfilter(b, a, audio)
-                    except Exception as e:
-                        print(f"Robot filter error: {e}")
-                        # Fallback to FFT-based filter
-                        n = len(audio)
-                        fft = np.fft.rfft(audio)
-                        freq = np.fft.rfftfreq(n, 1/sr)
-                        
-                        mask = (freq >= 500) & (freq <= 2000)
-                        fft_filtered = np.zeros_like(fft)
-                        fft_filtered[mask] = fft[mask]
-                        
-                        robot = np.fft.irfft(fft_filtered, n)
-                else:
-                    # Fallback to FFT-based filter
-                    n = len(audio)
-                    fft = np.fft.rfft(audio)
-                    freq = np.fft.rfftfreq(n, 1/sr)
-                    
-                    mask = (freq >= 500) & (freq <= 2000)
-                    fft_filtered = np.zeros_like(fft)
-                    fft_filtered[mask] = fft[mask]
-                    
-                    robot = np.fft.irfft(fft_filtered, n)
-                
-                # Add amplitude modulation for a "robotic" buzziness
-                t = np.arange(len(audio)) / sr
-                buzz_freq = 50  # Hz
-                buzz_depth = 0.3 * intensity
-                buzz = 1.0 - buzz_depth + buzz_depth * np.sin(2 * np.pi * buzz_freq * t)
-                
-                robot = robot * buzz
-                
-                # Mix with original based on intensity
+                # Use improved robot effect
+                robot = GeekyKokoroAdvancedVoiceNode._apply_robot(audio, sr, intensity)
                 result = audio * (1 - intensity) + robot * intensity
                 
             elif effect_name == "Telephone":
-                # Telephone effect - simplified bandpass filter
-                if SCIPY_AVAILABLE:
-                    try:
-                        nyquist = sr / 2
-                        low_freq = 300 / nyquist
-                        high_freq = 3400 / nyquist
-                        
-                        # Ensure frequencies are normalized correctly
-                        low_freq = min(max(low_freq, 0.01), 0.99)
-                        high_freq = min(max(high_freq, 0.01), 0.99)
-                        
-                        # Make sure low_freq < high_freq
-                        if low_freq >= high_freq:
-                            low_freq = high_freq * 0.5
-                        
-                        b, a = signal.butter(4, [low_freq, high_freq], btype='band')
-                        telephone = signal.lfilter(b, a, audio)
-                    except Exception as e:
-                        print(f"Telephone filter error: {e}")
-                        # Fallback to FFT-based filter
-                        n = len(audio)
-                        fft = np.fft.rfft(audio)
-                        freq = np.fft.rfftfreq(n, 1/sr)
-                        
-                        mask = (freq >= 300) & (freq <= 3400)
-                        fft_filtered = np.zeros_like(fft)
-                        fft_filtered[mask] = fft[mask]
-                        
-                        telephone = np.fft.irfft(fft_filtered, n)
-                else:
-                    # Fallback to FFT-based filter
-                    n = len(audio)
-                    fft = np.fft.rfft(audio)
-                    freq = np.fft.rfftfreq(n, 1/sr)
-                    
-                    mask = (freq >= 300) & (freq <= 3400)
-                    fft_filtered = np.zeros_like(fft)
-                    fft_filtered[mask] = fft[mask]
-                    
-                    telephone = np.fft.irfft(fft_filtered, n)
+                # Use improved telephone effect
+                phone = GeekyKokoroAdvancedVoiceNode._apply_telephone(audio, sr, intensity)
+                result = audio * (1 - intensity) + phone * intensity
                 
-                # Add mild distortion
-                telephone = np.tanh(telephone * 2) / 2
-                
-                # Add telephone line noise
-                noise = np.random.normal(0, 0.01, len(audio)) * intensity
-                telephone = telephone + noise
-                
-                # Mix with original based on intensity
-                result = audio * (1 - intensity) + telephone * intensity
+            elif effect_name == "Darth Vader":
+                # Use Darth Vader effect
+                vader = GeekyKokoroAdvancedVoiceNode._apply_darth_vader(audio, sr, intensity)
+                result = audio * (1 - intensity) + vader * intensity
                 
             elif effect_name == "Megaphone":
-                # Megaphone effect - simplified implementation
+                # Improved megaphone effect
+                filtered = np.zeros_like(audio)
+                
                 if SCIPY_AVAILABLE:
                     try:
                         nyquist = sr / 2
@@ -1209,39 +1334,23 @@ class GeekyKokoroAdvancedVoiceNode:
                             low_freq = high_freq * 0.5
                         
                         b, a = signal.butter(2, [low_freq, high_freq], btype='band')
-                        megaphone = signal.lfilter(b, a, audio)
+                        filtered = signal.filtfilt(b, a, audio)
                     except Exception as e:
                         print(f"Megaphone filter error: {e}")
-                        # Fallback to FFT-based filter
-                        n = len(audio)
-                        fft = np.fft.rfft(audio)
-                        freq = np.fft.rfftfreq(n, 1/sr)
-                        
-                        mask = (freq >= 500) & (freq <= 4000)
-                        fft_filtered = np.zeros_like(fft)
-                        fft_filtered[mask] = fft[mask]
-                        
-                        megaphone = np.fft.irfft(fft_filtered, n)
+                        filtered = audio
                 else:
-                    # Fallback to FFT-based filter
-                    n = len(audio)
-                    fft = np.fft.rfft(audio)
-                    freq = np.fft.rfftfreq(n, 1/sr)
-                    
-                    mask = (freq >= 500) & (freq <= 4000)
-                    fft_filtered = np.zeros_like(fft)
-                    fft_filtered[mask] = fft[mask]
-                    
-                    megaphone = np.fft.irfft(fft_filtered, n)
+                    filtered = audio
                 
                 # Add distortion
-                megaphone = np.clip(megaphone * 2.5, -0.9, 0.9)
+                megaphone = np.clip(filtered * 2.5, -0.9, 0.9)
                 
                 # Mix with original based on intensity
                 result = audio * (1 - intensity) + megaphone * intensity
                 
             elif effect_name == "Radio":
-                # Old radio effect - simplified implementation
+                # Improved radio effect
+                filtered = np.zeros_like(audio)
+                
                 if SCIPY_AVAILABLE:
                     try:
                         nyquist = sr / 2
@@ -1256,58 +1365,36 @@ class GeekyKokoroAdvancedVoiceNode:
                         if low_freq >= high_freq:
                             low_freq = high_freq * 0.5
                         
-                        b, a = signal.butter(4, [low_freq, high_freq], btype='band')
-                        radio = signal.lfilter(b, a, audio)
+                        b, a = signal.butter(2, [low_freq, high_freq], btype='band')
+                        filtered = signal.filtfilt(b, a, audio)
                     except Exception as e:
                         print(f"Radio filter error: {e}")
-                        # Fallback to FFT-based filter
-                        n = len(audio)
-                        fft = np.fft.rfft(audio)
-                        freq = np.fft.rfftfreq(n, 1/sr)
-                        
-                        mask = (freq >= 400) & (freq <= 3000)
-                        fft_filtered = np.zeros_like(fft)
-                        fft_filtered[mask] = fft[mask]
-                        
-                        radio = np.fft.irfft(fft_filtered, n)
+                        filtered = audio
                 else:
-                    # Fallback to FFT-based filter
-                    n = len(audio)
-                    fft = np.fft.rfft(audio)
-                    freq = np.fft.rfftfreq(n, 1/sr)
-                    
-                    mask = (freq >= 400) & (freq <= 3000)
-                    fft_filtered = np.zeros_like(fft)
-                    fft_filtered[mask] = fft[mask]
-                    
-                    radio = np.fft.irfft(fft_filtered, n)
+                    filtered = audio
                 
                 # Add mild distortion
-                radio = np.tanh(radio * 1.5) / 1.5
+                radio = np.tanh(filtered * 1.5) / 1.5
                 
                 # Add radio static noise
                 noise_level = 0.03 * intensity
                 static = np.random.normal(0, noise_level, len(audio))
                 
-                # Modulate static amplitude
-                static_env = np.abs(radio) + 0.1
-                static *= static_env
-                
-                radio = radio + static
-                
-                # Add amplitude modulation for radio fade effect
+                # Add AM effect
                 t = np.arange(len(audio)) / sr
                 am_depth = 0.2 * intensity
                 am_freq = 0.5  # Hz
                 am = 1.0 - am_depth + am_depth * np.sin(2 * np.pi * am_freq * t)
                 
-                radio *= am
+                radio = radio * am + static * 0.7
                 
                 # Mix with original based on intensity
                 result = audio * (1 - intensity) + radio * intensity
                 
             elif effect_name == "Underwater":
-                # Underwater effect - simplified implementation
+                # Improved underwater effect
+                underwater = np.zeros_like(audio)
+                
                 if SCIPY_AVAILABLE:
                     try:
                         nyquist = sr / 2
@@ -1316,31 +1403,13 @@ class GeekyKokoroAdvancedVoiceNode:
                         # Ensure frequency is normalized correctly
                         cutoff = min(max(cutoff, 0.01), 0.99)
                         
-                        b, a = signal.butter(4, cutoff, btype='low')
-                        underwater = signal.lfilter(b, a, audio)
+                        b, a = signal.butter(2, cutoff, btype='low')
+                        underwater = signal.filtfilt(b, a, audio)
                     except Exception as e:
                         print(f"Underwater filter error: {e}")
-                        # Fallback to FFT-based filter
-                        n = len(audio)
-                        fft = np.fft.rfft(audio)
-                        freq = np.fft.rfftfreq(n, 1/sr)
-                        
-                        mask = freq <= 800
-                        fft_filtered = np.zeros_like(fft)
-                        fft_filtered[mask] = fft[mask]
-                        
-                        underwater = np.fft.irfft(fft_filtered, n)
+                        underwater = audio
                 else:
-                    # Fallback to FFT-based filter
-                    n = len(audio)
-                    fft = np.fft.rfft(audio)
-                    freq = np.fft.rfftfreq(n, 1/sr)
-                    
-                    mask = freq <= 800
-                    fft_filtered = np.zeros_like(fft)
-                    fft_filtered[mask] = fft[mask]
-                    
-                    underwater = np.fft.irfft(fft_filtered, n)
+                    underwater = audio
                 
                 # Apply subtle tremolo
                 t = np.arange(len(audio)) / sr
@@ -1354,7 +1423,7 @@ class GeekyKokoroAdvancedVoiceNode:
                 result = audio * (1 - intensity) + underwater_effect * intensity
                 
             elif effect_name == "Whisper":
-                # Whisper effect - simplified implementation
+                # Improved whisper effect
                 # Reduce volume and add noise
                 whisper = audio * 0.6
                 
@@ -1367,31 +1436,10 @@ class GeekyKokoroAdvancedVoiceNode:
                         # Ensure frequency is normalized correctly
                         cutoff = min(max(cutoff, 0.01), 0.99)
                         
-                        b, a = signal.butter(4, cutoff, btype='high')
-                        whisper = signal.lfilter(b, a, whisper)
+                        b, a = signal.butter(2, cutoff, btype='high')
+                        whisper = signal.filtfilt(b, a, whisper)
                     except Exception as e:
                         print(f"Whisper filter error: {e}")
-                        # Fallback to FFT-based filter
-                        n = len(audio)
-                        fft = np.fft.rfft(whisper)
-                        freq = np.fft.rfftfreq(n, 1/sr)
-                        
-                        mask = freq >= 600
-                        fft_filtered = np.zeros_like(fft)
-                        fft_filtered[mask] = fft[mask]
-                        
-                        whisper = np.fft.irfft(fft_filtered, n)
-                else:
-                    # Fallback to FFT-based filter
-                    n = len(audio)
-                    fft = np.fft.rfft(whisper)
-                    freq = np.fft.rfftfreq(n, 1/sr)
-                    
-                    mask = freq >= 600
-                    fft_filtered = np.zeros_like(fft)
-                    fft_filtered[mask] = fft[mask]
-                    
-                    whisper = np.fft.irfft(fft_filtered, n)
                 
                 # Add breath noise
                 noise_level = 0.15 * intensity
@@ -1407,18 +1455,15 @@ class GeekyKokoroAdvancedVoiceNode:
                 
                 whisper = whisper + breath
                 
-                # Add slight distortion to simulate air turbulence
-                whisper = np.clip(whisper * 1.5, -0.9, 0.9)
-                
                 # Mix with original based on intensity
                 result = audio * (1 - intensity) + whisper * intensity
                 
             elif effect_name == "Demon":
-                # Demon voice effect - simplified implementation
-                # Pitch shift down using our robust method
+                # Improved demon effect
+                # Pitch shift down
                 try:
-                    demon = GeekyKokoroAdvancedVoiceNode._apply_pitch_shift(
-                        audio, sr, n_steps=-5 * intensity
+                    demon = GeekyKokoroAdvancedVoiceNode._improved_simple_pitch_shift(
+                        audio, sr, -5 * intensity
                     )
                 except Exception as e:
                     print(f"Demon pitch shift error: {e}")
@@ -1438,36 +1483,33 @@ class GeekyKokoroAdvancedVoiceNode:
                 result = audio * (1 - intensity) + demon * intensity
                 
             elif effect_name == "8-bit Game":
-                # 8-bit video game sound effect - simplified implementation
+                # Improved 8-bit video game sound effect
                 # Reduce bit depth
                 bit_depth = 3 + (1 - intensity) * 5  # 3 to 8 bits
                 steps = 2 ** int(bit_depth)
                 game = np.round(audio * (steps/2)) / (steps/2)
                 
-                # Reduce sample rate (without actually changing SR)
+                # Simple but effective downsample effect
                 sr_reduction = 0.1 + (1 - intensity) * 0.4  # 0.1x to 0.5x original SR
-                downsample_factor = int(1 / sr_reduction)
+                downsample_factor = max(int(1 / sr_reduction), 1)
                 
-                # Protect against very small downsample factors
-                if downsample_factor < 1:
-                    downsample_factor = 1
+                # Use a more reliable implementation for sample rate reduction
+                downsampled = np.zeros_like(audio)
                 
-                # Downsample and then upsample to create the effect
-                downsampled = np.zeros(len(audio))
                 for i in range(0, len(audio), downsample_factor):
                     if i < len(audio):
                         value = game[i]
                         for j in range(min(downsample_factor, len(audio) - i)):
-                            downsampled[i + j] = value
-                
-                game = downsampled
+                            if i + j < len(downsampled):
+                                downsampled[i + j] = value
                 
                 # Mix with original based on intensity
-                result = audio * (1 - intensity) + game * intensity
+                result = audio * (1 - intensity) + downsampled * intensity
             
             # Normalize output
-            if np.max(np.abs(result)) > 0:
-                result = result / np.max(np.abs(result)) * 0.95
+            max_val = np.max(np.abs(result))
+            if max_val > 0.95:
+                result = result / max_val * 0.95
                 
             return result
         except Exception as e:
@@ -1606,7 +1648,7 @@ class GeekyKokoroAdvancedVoiceNode:
                             cutoff_high = min(3000 / nyquist, 0.9)  # Ensure < 1.0
                             
                             b, a = signal.butter(2, cutoff_high, btype='high')
-                            breath_noise = signal.lfilter(b, a, shaped_noise)
+                            breath_noise = signal.filtfilt(b, a, shaped_noise)
                             
                             # Add to result based on breathiness parameter
                             result = result * (1 - breathiness * 0.3) + breath_noise * breathiness
@@ -1615,19 +1657,8 @@ class GeekyKokoroAdvancedVoiceNode:
                             # If filter fails, just use shaped noise
                             result = result * (1 - breathiness * 0.2) + shaped_noise * breathiness * 0.2
                     else:
-                        # FFT-based high-pass filter
-                        n = len(audio)
-                        fft = np.fft.rfft(shaped_noise)
-                        freq = np.fft.rfftfreq(n, 1/sr)
-                        
-                        mask = freq >= 3000
-                        fft_filtered = np.zeros_like(fft)
-                        fft_filtered[mask] = fft[mask]
-                        
-                        breath_noise = np.fft.irfft(fft_filtered, n)
-                        
-                        # Add to result
-                        result = result * (1 - breathiness * 0.3) + breath_noise * breathiness
+                        # Add to result directly
+                        result = result * (1 - breathiness * 0.2) + shaped_noise * breathiness * 0.2
                     
                 except Exception as e:
                     print(f"Voice morph breathiness error: {e}")
@@ -1751,6 +1782,22 @@ class GeekyKokoroAdvancedVoiceNode:
                     "reverb_amount": 0.3,
                     "compression": 0.6,
                     "harmonics": 0.4
+                },
+                # New presets
+                "Darth Vader": {
+                    "character_effect": "Darth Vader",
+                    "character_intensity": 1.0
+                },
+                "Underwater": {
+                    "character_effect": "Underwater",
+                    "character_intensity": 0.8,
+                    "reverb_amount": 0.4
+                },
+                "TV Announcer": {
+                    "compression": 0.8,
+                    "bass_boost": 0.3,
+                    "mid_boost": 0.5,
+                    "warmth": 0.3
                 }
             }
             
@@ -1858,7 +1905,7 @@ class GeekyKokoroAdvancedVoiceNode:
                      character_effect="None", character_intensity=0.7,
                      # Presets
                      preset="None", preset_strength=0.7):
-        """Apply comprehensive voice processing with effect groups and improved algorithms"""
+        """Enhanced processing function with improved error handling"""
         # Default output in case of total failure
         default_output = {"waveform": torch.zeros((1, 1, 1000), dtype=torch.float32), "sample_rate": 24000}
         
@@ -1897,6 +1944,9 @@ class GeekyKokoroAdvancedVoiceNode:
             original_length = waveform.shape[-1]
             audio_data = waveform.squeeze(0).squeeze(0).cpu().numpy().astype(np.float32)
             
+            # Debug original input data
+            self.debug_audio_stats(audio_data, "input_audio")
+            
             # Create a copy of the original for blending
             original_audio = audio_data.copy()
             result = audio_data.copy()
@@ -1904,96 +1954,179 @@ class GeekyKokoroAdvancedVoiceNode:
             # Apply preset first if specified (this overrides individual settings)
             if preset != "None" and preset_strength > 0:
                 print(f"Applying preset: {preset} with strength {preset_strength}")
-                result = self._apply_preset(result, sample_rate, preset, preset_strength)
+                try:
+                    result = self._apply_preset(result, sample_rate, preset, preset_strength)
+                    self.debug_audio_stats(result, "after_preset")
+                except Exception as e:
+                    print(f"Preset application failed: {e}")
+                    result = original_audio.copy()
             else:
                 # Apply voice morphing if enabled
                 if voice_morph != "None" and morph_intensity > 0:
                     print(f"Applying voice morph: {voice_morph} with intensity {morph_intensity}")
-                    result = self._apply_voice_morph(result, sample_rate, voice_morph, morph_intensity)
+                    try:
+                        result = self._apply_voice_morph(result, sample_rate, voice_morph, morph_intensity)
+                        self.debug_audio_stats(result, "after_voice_morph")
+                    except Exception as e:
+                        print(f"Voice morph failed: {e}")
                 
                 # Apply pitch and formant modifications if enabled
                 if enable_pitch_formant:
                     if abs(pitch_shift) >= 0.1:
                         print(f"Applying pitch shift: {pitch_shift}")
-                        result = self._apply_pitch_shift(result, sample_rate, pitch_shift)
+                        try:
+                            result = self._apply_pitch_shift(result, sample_rate, pitch_shift)
+                            self.debug_audio_stats(result, "after_pitch_shift")
+                        except Exception as e:
+                            print(f"Pitch shift failed: {e}")
                     
                     if abs(formant_shift) >= 0.1:
                         print(f"Applying formant shift: {formant_shift}")
-                        result = self._apply_formant_shift(result, sample_rate, formant_shift)
+                        try:
+                            result = self._apply_formant_shift(result, sample_rate, formant_shift)
+                            self.debug_audio_stats(result, "after_formant_shift")
+                        except Exception as e:
+                            print(f"Formant shift failed: {e}")
                     
                     if auto_tune >= 0.1:
                         print(f"Applying auto-tune: {auto_tune}")
-                        result = self._apply_auto_tune(result, sample_rate, auto_tune)
+                        try:
+                            result = self._apply_auto_tune(result, sample_rate, auto_tune)
+                            self.debug_audio_stats(result, "after_auto_tune")
+                        except Exception as e:
+                            print(f"Auto-tune failed: {e}")
                 
                 # Apply time-based effects if enabled
                 if enable_time:
                     if abs(time_stretch - 1.0) >= 0.01:
                         print(f"Applying time stretch: {time_stretch}")
-                        result = self._apply_time_stretch(result, sample_rate, time_stretch)
+                        try:
+                            result = self._apply_time_stretch(result, sample_rate, time_stretch)
+                            self.debug_audio_stats(result, "after_time_stretch")
+                        except Exception as e:
+                            print(f"Time stretch failed: {e}")
                     
                     if vibrato >= 0.1:
                         print(f"Applying vibrato: {vibrato} with speed {vibrato_speed}")
-                        result = self._apply_vibrato(result, sample_rate, vibrato, vibrato_speed)
+                        try:
+                            result = self._apply_vibrato(result, sample_rate, vibrato, vibrato_speed)
+                            self.debug_audio_stats(result, "after_vibrato")
+                        except Exception as e:
+                            print(f"Vibrato failed: {e}")
                 
                 # Apply spatial effects if enabled
                 if enable_spatial:
                     if reverb_amount >= 0.1:
                         print(f"Applying reverb: {reverb_amount}")
-                        result = self._apply_reverb(result, sample_rate, reverb_amount, 
-                                                  reverb_room_size, reverb_damping)
+                        try:
+                            result = self._apply_reverb(result, sample_rate, reverb_amount, 
+                                                      reverb_room_size, reverb_damping)
+                            self.debug_audio_stats(result, "after_reverb")
+                        except Exception as e:
+                            print(f"Reverb failed: {e}")
                     
                     if echo_delay >= 0.1:
                         print(f"Applying echo: {echo_delay}")
-                        result = self._apply_echo(result, sample_rate, echo_delay, echo_feedback)
+                        try:
+                            result = self._apply_echo(result, sample_rate, echo_delay, echo_feedback)
+                            self.debug_audio_stats(result, "after_echo")
+                        except Exception as e:
+                            print(f"Echo failed: {e}")
                 
                 # Apply tone shaping if enabled
                 if enable_tone:
                     if abs(bass_boost) >= 0.1 or abs(mid_boost) >= 0.1 or abs(treble_boost) >= 0.1:
                         print(f"Applying EQ: bass={bass_boost}, mid={mid_boost}, treble={treble_boost}")
-                        result = self._apply_eq(result, sample_rate, bass_boost, mid_boost, treble_boost)
+                        try:
+                            result = self._apply_eq(result, sample_rate, bass_boost, mid_boost, treble_boost)
+                            self.debug_audio_stats(result, "after_eq")
+                        except Exception as e:
+                            print(f"EQ failed: {e}")
                     
                     if harmonics >= 0.1:
                         print(f"Applying harmonics: {harmonics}")
-                        result = self._apply_harmonics(result, sample_rate, harmonics)
+                        try:
+                            result = self._apply_harmonics(result, sample_rate, harmonics)
+                            self.debug_audio_stats(result, "after_harmonics")
+                        except Exception as e:
+                            print(f"Harmonics failed: {e}")
                 
                 # Apply effects if enabled
                 if enable_effects:
                     if distortion >= 0.1:
                         print(f"Applying distortion: {distortion}")
-                        result = self._apply_distortion(result, distortion)
+                        try:
+                            result = self._apply_distortion(result, distortion)
+                            self.debug_audio_stats(result, "after_distortion")
+                        except Exception as e:
+                            print(f"Distortion failed: {e}")
                     
                     if tremolo >= 0.1:
                         print(f"Applying tremolo: {tremolo}")
-                        result = self._apply_tremolo(result, tremolo, sample_rate)
+                        try:
+                            result = self._apply_tremolo(result, tremolo, sample_rate)
+                            self.debug_audio_stats(result, "after_tremolo")
+                        except Exception as e:
+                            print(f"Tremolo failed: {e}")
                     
                     if bitcrush >= 0.1:
                         print(f"Applying bitcrush: {bitcrush}")
-                        result = self._apply_bitcrush(result, bitcrush)
+                        try:
+                            result = self._apply_bitcrush(result, bitcrush)
+                            self.debug_audio_stats(result, "after_bitcrush")
+                        except Exception as e:
+                            print(f"Bitcrush failed: {e}")
                     
                     if noise_reduction >= 0.1:
                         print(f"Applying noise reduction: {noise_reduction}")
-                        result = self._apply_noise_reduction(result, noise_reduction)
+                        try:
+                            result = self._apply_noise_reduction(result, noise_reduction)
+                            self.debug_audio_stats(result, "after_noise_reduction")
+                        except Exception as e:
+                            print(f"Noise reduction failed: {e}")
                 
                 # Apply dynamics processing if enabled
                 if enable_dynamics:
                     if compression >= 0.1:
                         print(f"Applying compression: {compression}")
-                        result = self._apply_compression(result, compression, limit_ceiling)
+                        try:
+                            result = self._apply_compression(result, compression, limit_ceiling)
+                            self.debug_audio_stats(result, "after_compression")
+                        except Exception as e:
+                            print(f"Compression failed: {e}")
                     
                     if warmth >= 0.1:
                         print(f"Applying warmth: {warmth}")
-                        result = self._apply_warmth(result, warmth)
+                        try:
+                            result = self._apply_warmth(result, warmth)
+                            self.debug_audio_stats(result, "after_warmth")
+                        except Exception as e:
+                            print(f"Warmth failed: {e}")
                 
                 # Apply character effect if specified
                 if character_effect != "None" and character_intensity > 0:
                     print(f"Applying character effect: {character_effect}")
-                    result = self._apply_character_effect(result, sample_rate, 
-                                                        character_effect, character_intensity)
+                    try:
+                        result = self._apply_character_effect(result, sample_rate, 
+                                                            character_effect, character_intensity)
+                        self.debug_audio_stats(result, "after_character_effect")
+                    except Exception as e:
+                        print(f"Character effect failed: {e}")
             
             # Apply overall effect blend (mix with original)
             if effect_blend < 1.0:
                 print(f"Blending with original: {effect_blend * 100}% effect, {(1 - effect_blend) * 100}% original")
-                result = original_audio * (1 - effect_blend) + result * effect_blend
+                try:
+                    result = original_audio * (1 - effect_blend) + result * effect_blend
+                    self.debug_audio_stats(result, "after_blending")
+                except Exception as e:
+                    print(f"Blending failed: {e}")
+                    result = original_audio  # Revert to original if blending fails
+            
+            # Check for NaN or inf values before proceeding
+            if np.any(np.isnan(result)) or np.any(np.isinf(result)):
+                print("WARNING: NaN or inf values detected in output, using original audio")
+                result = original_audio.copy()
             
             # Ensure output length matches input
             if len(result) != original_length:
