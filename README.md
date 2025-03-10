@@ -30,37 +30,24 @@ A powerful and feature-rich custom node collection for ComfyUI that integrates t
 - Python 3.8 or newer
 - PyTorch 2.0+ (already included with ComfyUI)
 
-### Automatic Installation
+### Option 1: Install via ComfyUI-Manager (Recommended)
+1. Open ComfyUI
+2. Click on "Manager" in the menu
+3. Go to "Install Custom Nodes" tab
+4. Search for "Geeky Kokoro TTS"
+5. Click "Install" and restart ComfyUI when prompted
 
-1. Clone this repository into your ComfyUI custom_nodes directory:
-```bash
-cd ComfyUI-Geeky-Kokoro-TTS
-git clone https://github.com/GeekyGhost/ComfyUI-Geeky-Kokoro-TTS.git
-```
-
-2. Run the installer script:
-```bash
-cd geeky_kokoro_tts
-python install.py
-```
-
-The installer will:
-- Detect your ComfyUI installation
-- Install required dependencies (including audio processing libraries)
-- Download the Kokoro model files (if needed)
-- Set up both the TTS and Voice Mod nodes
-
-### Manual Installation
+### Option 2: Manual Installation
 
 1. Clone this repository into your ComfyUI's `custom_nodes` folder:
 ```bash
 cd ComfyUI/custom_nodes
-git clone https://github.com/yourusername/geeky-kokoro-tts.git geeky_kokoro_tts
+git clone https://github.com/GeekyGhost/ComfyUI-Geeky-Kokoro-TTS.git
 ```
 
 2. Install the required dependencies:
 ```bash
-cd geeky_kokoro_tts
+cd ComfyUI-Geeky-Kokoro-TTS
 pip install -r requirements.txt
 
 # Optional but recommended for better audio processing:
@@ -80,6 +67,16 @@ wget https://github.com/nazdridoy/kokoro-tts/releases/download/v1.0.0/voices-v1.
 
 4. Restart ComfyUI
 
+### Important Installation Notes
+
+1. **Directory Structure**: When installing manually, ensure the node is in a folder named `ComfyUI-Geeky-Kokoro-TTS` (not `geeky_kokoro_tts`) under your ComfyUI's custom_nodes directory.
+
+2. **Model Files**: The node will look for model files in:
+   - `ComfyUI/custom_nodes/ComfyUI-Geeky-Kokoro-TTS/models/` 
+   - Hugging Face cache directory (automatically downloaded when using ComfyUI-Manager)
+
+3. **First Run**: On first run, the node will download additional voice data from Hugging Face if needed
+
 ### Troubleshooting Installation
 
 #### Dependency Issues
@@ -95,13 +92,31 @@ wget https://github.com/nazdridoy/kokoro-tts/releases/download/v1.0.0/voices-v1.
   pip install numba==0.56.4
   pip install librosa==0.10.0
   ```
+- **docopt dependency errors**: If you encounter docopt-related errors, install it explicitly:
+  ```bash
+  pip install docopt==0.6.2
+  ```
 
-#### Model Files
+#### Model Files Issues
 If model download fails, you can manually download from these URLs:
 - Kokoro model: https://github.com/nazdridoy/kokoro-tts/releases/download/v1.0.0/kokoro-v1.0.onnx
 - Voices file: https://github.com/nazdridoy/kokoro-tts/releases/download/v1.0.0/voices-v1.0.bin
 
-Place these files in the `ComfyUI/custom_nodes/geeky_kokoro_tts/models/` directory.
+Place these files in the `ComfyUI/custom_nodes/ComfyUI-Geeky-Kokoro-TTS/models/` directory.
+
+#### Model Location Note
+When installed via ComfyUI-Manager, the model files are stored in your HuggingFace cache directory:
+- Windows: `C:\Users\{username}\.cache\huggingface\`
+- Mac/Linux: `~/.cache/huggingface/`
+
+If you're switching between manual and manager installation, you may need to ensure the models are in the correct location.
+
+#### Import Failed Issues
+If you see "IMPORT FAILED" in your console log:
+1. Make sure you've installed all required dependencies
+2. Check that your directory is named `ComfyUI-Geeky-Kokoro-TTS` (not `geeky_kokoro_tts`)
+3. Ensure the model files are in the correct location
+4. Look for specific error messages in the ComfyUI console/log
 
 ## 📚 Usage Guide
 
@@ -249,7 +264,7 @@ The TTS node leverages GPU acceleration for the Kokoro model when available:
 if use_gpu and True not in self.MODEL and torch.cuda.is_available():
     try:
         with self.MODEL_LOCK:
-            self.MODEL[True] = KModel().to('cuda').eval()
+            self.MODEL[True] = KModel(repo_id='hexgrad/Kokoro-82M').to('cuda').eval()
     except Exception as e:
         print(f"GPU load failed: {e}. Using CPU.")
         use_gpu = False
@@ -333,7 +348,9 @@ The Voice Mod node includes several presets for common voice transformations:
 - **Memory Errors**: If you run into memory issues, try processing shorter text segments
 - **Audio Distortion**: For distorted output, try reducing effect intensities or disabling some effect groups
 - **Missing Dependencies**: Check the console for warnings about missing libraries (librosa, resampy, etc.)
-- **Model Load Errors**: Ensure the model files are correctly installed in the `models` directory
+- **Model Load Errors**: Ensure the model files are correctly installed in the proper directory
+- **"Defaulting repo_id" Warning**: This is normal on first run and doesn't affect functionality
+- **Directory Naming Issues**: If you see import errors, ensure your node is installed in a directory named `ComfyUI-Geeky-Kokoro-TTS`
 
 ## 🤝 Contributing
 
