@@ -6,7 +6,7 @@ While this repo uses an MIT license, the models themselves do not. Make sure you
 
 A powerful and feature-rich custom node collection for ComfyUI that integrates the Kokoro TTS (Text-to-Speech) system with advanced voice modification capabilities. This package allows you to generate natural-sounding speech and apply various voice effects within ComfyUI workflows.
 
-<img width="460" alt="Screenshot 2025-03-05 151117" src="https://github.com/user-attachments/assets/0033cc71-40f1-44c3-b668-94f87d7eab9a" />
+<img width="1044" alt="Screenshot 2025-03-18 075032" src="https://github.com/user-attachments/assets/a4ca7129-153e-4bfb-9e5f-7510d598d099" />
 
 
 ## ✨ Features
