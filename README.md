@@ -6,7 +6,7 @@ A powerful and feature-rich custom node collection for ComfyUI that integrates t
 
 While this repository uses an MIT license, the models themselves may have different licensing terms. Please check the model licenses before using them in your projects.
 
-<img width="460" alt="Screenshot of Geeky Kokoro TTS in ComfyUI" src="https://github.com/user-attachments/assets/0033cc71-40f1-44c3-b668-94f87d7eab9a" />
+<img width="1044" alt="Screenshot 2025-03-18 075032" src="https://github.com/user-attachments/assets/cdffe58a-86bf-4025-838f-7f554beb5464" />
 
 ## ✨ Features
 
