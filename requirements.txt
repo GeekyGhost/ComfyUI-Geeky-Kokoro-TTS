@@ -1,9 +1,25 @@
+# Core TTS dependencies
 kokoro>=0.8.4
-soundfile>=0.12.1
-numpy>=1.22.0
 torch>=2.0.0
-tqdm>=4.64.0
 einops>=0.6.0
+
+# Audio processing dependencies
+torchaudio>=2.0.0
+soundfile>=0.12.1
 librosa>=0.10.0
 scipy>=1.9.0
 resampy>=0.4.3
+numpy>=1.22.0
+
+# Voice Mod dependencies
+numba>=0.56.4
+llvmlite>=0.39.0
+
+# WhisperSpeech dependencies
+whisperspeech>=0.2.0
+webdataset
+nltk>=3.8.1
+
+# Utilities
+tqdm>=4.64.0
+requests>=2.28.0
