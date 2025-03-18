@@ -11,7 +11,7 @@ from functools import lru_cache
 
 def simple_pitch_shift(audio, sr, n_steps, bins_per_octave=12):
     """
-    Basic pitch shifting using resampling technique, no resampy required
+    Basic pitch shifting using resampling technique, no resampy required.
     
     Parameters:
     -----------
@@ -48,28 +48,9 @@ def simple_pitch_shift(audio, sr, n_steps, bins_per_octave=12):
     
     return result
 
-def scipy_resample_fixed_length(audio, factor):
-    """
-    Resample audio using scipy.signal.resample with fixed output length
-    
-    Parameters:
-    -----------
-    audio : numpy.ndarray
-        Audio signal
-    factor : float
-        Resampling factor (>1 = upsample, <1 = downsample)
-        
-    Returns:
-    --------
-    numpy.ndarray
-        Resampled audio
-    """
-    output_size = int(len(audio) / factor)
-    return signal.resample(audio, output_size)
-
 def stft_phase_vocoder(audio, sr, n_steps, bins_per_octave=12):
     """
-    Phase vocoder pitch shifting using STFT, more advanced than simple resampling
+    Phase vocoder pitch shifting using STFT, more advanced than simple resampling.
     
     Parameters:
     -----------
@@ -160,7 +141,25 @@ def stft_phase_vocoder(audio, sr, n_steps, bins_per_octave=12):
 
 def stft(y, n_fft=2048, hop_length=None, win_length=None, window='hann'):
     """
-    Short-time Fourier transform using scipy for when librosa is not available
+    Short-time Fourier transform using scipy for when librosa is not available.
+    
+    Parameters:
+    -----------
+    y : numpy.ndarray
+        Audio signal
+    n_fft : int
+        FFT size
+    hop_length : int
+        Hop length between frames
+    win_length : int
+        Window length
+    window : str
+        Window type
+        
+    Returns:
+    --------
+    numpy.ndarray
+        STFT matrix
     """
     if hop_length is None:
         hop_length = n_fft // 4
@@ -204,7 +203,25 @@ def stft(y, n_fft=2048, hop_length=None, win_length=None, window='hann'):
 
 def istft(stft_matrix, hop_length=None, win_length=None, window='hann', length=None):
     """
-    Inverse short-time Fourier transform using scipy for when librosa is not available
+    Inverse short-time Fourier transform using scipy for when librosa is not available.
+    
+    Parameters:
+    -----------
+    stft_matrix : numpy.ndarray
+        STFT matrix
+    hop_length : int
+        Hop length between frames
+    win_length : int
+        Window length
+    window : str
+        Window type
+    length : int
+        Target length
+        
+    Returns:
+    --------
+    numpy.ndarray
+        Reconstructed audio signal
     """
     n_fft = 2 * (stft_matrix.shape[0] - 1)
     
@@ -265,7 +282,7 @@ def istft(stft_matrix, hop_length=None, win_length=None, window='hann', length=N
 
 def formant_shift_basic(audio, sr, shift_amount):
     """
-    Basic formant shifting using spectral envelope manipulation
+    Basic formant shifting using spectral envelope manipulation.
     
     Parameters:
     -----------
@@ -331,7 +348,23 @@ def formant_shift_basic(audio, sr, shift_amount):
 
 def amplitude_to_db(S, ref=1.0, amin=1e-10, top_db=80.0):
     """
-    Convert amplitude spectrogram to dB-scaled spectrogram
+    Convert amplitude spectrogram to dB-scaled spectrogram.
+    
+    Parameters:
+    -----------
+    S : numpy.ndarray
+        Input spectrogram
+    ref : float
+        Reference value
+    amin : float
+        Minimum amplitude
+    top_db : float
+        Threshold the output at top_db below peak
+        
+    Returns:
+    --------
+    numpy.ndarray
+        dB-scaled spectrogram
     """
     magnitude = np.abs(S)
     
@@ -346,13 +379,30 @@ def amplitude_to_db(S, ref=1.0, amin=1e-10, top_db=80.0):
 
 def db_to_amplitude(db, ref=1.0):
     """
-    Convert dB-scaled spectrogram to amplitude spectrogram
+    Convert dB-scaled spectrogram to amplitude spectrogram.
+    
+    Parameters:
+    -----------
+    db : numpy.ndarray
+        dB-scaled spectrogram
+    ref : float
+        Reference value
+        
+    Returns:
+    --------
+    numpy.ndarray
+        Amplitude spectrogram
     """
     return ref * 10.0 ** (db / 20.0)
 
 def detect_available_libraries():
     """
-    Detect which audio processing libraries are available
+    Detect which audio processing libraries are available.
+    
+    Returns:
+    --------
+    dict
+        Dictionary with library names as keys and availability as boolean values
     """
     available_libs = {
         'librosa': False,
@@ -381,44 +431,3 @@ def detect_available_libraries():
         pass
     
     return available_libs
-
-def get_optimal_pitch_shift_method():
-    """
-    Determine the best available pitch shifting method
-    
-    Returns:
-    --------
-    str
-        Name of the best available method:
-        - 'librosa_resampy': Best quality, requires librosa and resampy
-        - 'stft_phase_vocoder': Good quality, no resampy required
-        - 'simple': Basic quality, minimal dependencies
-    """
-    libs = detect_available_libraries()
-    
-    if libs['librosa'] and libs['resampy']:
-        return 'librosa_resampy'
-    elif libs['librosa']:
-        return 'librosa_no_resampy'
-    elif libs['scipy']:
-        return 'stft_phase_vocoder'
-    else:
-        return 'simple'
-
-def get_optimal_formant_shift_method():
-    """
-    Determine the best available formant shifting method
-    
-    Returns:
-    --------
-    str
-        Name of the best available method:
-        - 'librosa': Best quality, requires librosa
-        - 'basic': Basic quality, minimal dependencies
-    """
-    libs = detect_available_libraries()
-    
-    if libs['librosa']:
-        return 'librosa'
-    else:
-        return 'basic'
