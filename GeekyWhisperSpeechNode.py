@@ -1,6 +1,7 @@
 """
 GeekyWhisperSpeech node for ComfyUI.
 Provides reliable voice cloning with optimized performance and improved chunking.
+Incorporates advanced techniques from the original WhisperSpeech implementation.
 """
 import os
 import torch
@@ -11,16 +12,27 @@ import shutil
 import time
 import threading
 import re
+import math
+import logging
+from os.path import expanduser
 from pathlib import Path
+from contextlib import contextmanager, nullcontext
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("GeekyWhisperSpeech")
 
 # Add WhisperSpeech integration
 try:
     from whisperspeech.pipeline import Pipeline
     WHISPER_AVAILABLE = True
-    print("WhisperSpeech imported successfully")
+    logger.info("WhisperSpeech imported successfully")
 except ImportError:
     WHISPER_AVAILABLE = False
-    print("WhisperSpeech not available. Will use fallback.")
+    logger.warning("WhisperSpeech not available. Will use fallback.")
 
 # Disable Torch Dynamo to avoid Triton-related errors
 try:
@@ -37,6 +49,7 @@ class GeekyWhisperSpeechNode:
     WHISPER_PIPELINE = None
     EMBEDDING_CACHE = {}  # Cache for speaker embeddings
     PIPELINE_LOCK = threading.Lock()  # Lock for thread-safe pipeline access
+    DEFAULT_SPEAKER = None  # Default speaker embedding for fallback
     
     @classmethod
     def INPUT_TYPES(cls):
@@ -53,9 +66,12 @@ class GeekyWhisperSpeechNode:
                 "second_voice": ("AUDIO",),
                 "blend_ratio": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.01, "display": "slider"}),
                 "output_volume": ("FLOAT", {"default": 0.0, "min": -60.0, "max": 60.0, "step": 1.0, "display": "slider"}),
-                "use_gpu": ("BOOLEAN", {"default": torch.cuda.is_available()}),
+                "use_gpu": ("BOOLEAN", {"default": True}),
                 "cache_embeddings": ("BOOLEAN", {"default": True}),
-                "smart_chunking": ("BOOLEAN", {"default": True})
+                "smart_chunking": ("BOOLEAN", {"default": True}),
+                "characters_per_second": ("FLOAT", {"default": 13.0, "min": 5.0, "max": 25.0, "step": 0.5}),
+                "temperature": ("FLOAT", {"default": 0.7, "min": 0.1, "max": 1.5, "step": 0.05}),
+                "max_chunk_size": ("INT", {"default": 350, "min": 100, "max": 800, "step": 50})
             }
         }
     
@@ -64,20 +80,55 @@ class GeekyWhisperSpeechNode:
     FUNCTION = "generate_speech"
     CATEGORY = "audio"
     
-    def get_whisper_pipeline(self, use_gpu=False):
-        """Get or initialize the WhisperSpeech pipeline with thread safety."""
+    @staticmethod
+    def get_compute_device():
+        """Intelligently select the best available compute device.
+        Directly adapted from WhisperSpeech's inference.py
+        """
+        if torch.cuda.is_available() and (torch.version.cuda or torch.version.hip):
+            return 'cuda'
+        elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return 'mps'
+        else:
+            return 'cpu'
+    
+    @staticmethod
+    def inference_context():
+        """Create appropriate context for inference based on available hardware.
+        Adapted from WhisperSpeech's inference.py
+        """
+        if torch.cuda.is_available():
+            return torch.backends.cuda.sdp_kernel(enable_flash=False, enable_mem_efficient=False, enable_math=True)
+        else:
+            return nullcontext()
+    
+    def get_whisper_pipeline(self, use_gpu=True, optimize=True, torch_compile=False):
+        """Get or initialize the WhisperSpeech pipeline with thread safety and optimizations."""
         if not WHISPER_AVAILABLE:
             return None
         
         with self.PIPELINE_LOCK:    
             if self.__class__.WHISPER_PIPELINE is None:
                 try:
-                    print("Initializing WhisperSpeech pipeline...")
-                    # Initialize without torch_compile to avoid Triton errors
-                    self.__class__.WHISPER_PIPELINE = Pipeline(torch_compile=False)
-                    print("WhisperSpeech pipeline initialized successfully")
+                    logger.info("Initializing WhisperSpeech pipeline...")
+                    device = self.get_compute_device() if use_gpu else "cpu"
+                    
+                    # Initialize with optimization flags
+                    self.__class__.WHISPER_PIPELINE = Pipeline(
+                        torch_compile=torch_compile,
+                        device=device,
+                        optimize=optimize
+                    )
+                    
+                    # Load default speaker if needed
+                    if self.__class__.DEFAULT_SPEAKER is None:
+                        self.__class__.DEFAULT_SPEAKER = self.__class__.WHISPER_PIPELINE.default_speaker
+                    
+                    logger.info(f"WhisperSpeech pipeline initialized successfully on {device}")
                 except Exception as e:
-                    print(f"Error initializing WhisperSpeech pipeline: {e}")
+                    logger.error(f"Error initializing WhisperSpeech pipeline: {e}")
+                    import traceback
+                    traceback.print_exc()
                     return None
         
         return self.__class__.WHISPER_PIPELINE
@@ -98,28 +149,34 @@ class GeekyWhisperSpeechNode:
                     min_val = float(torch.min(waveform))
                     max_val = float(torch.max(waveform))
                     mean_val = float(torch.mean(waveform))
-                    return f"audio_{shape_str}_{min_val:.4f}_{max_val:.4f}_{mean_val:.4f}"
+                    std_val = float(torch.std(waveform))
+                    # Add more stats for better uniqueness
+                    rms_val = float(torch.sqrt(torch.mean(waveform**2)))
+                    return f"audio_{shape_str}_{min_val:.4f}_{max_val:.4f}_{mean_val:.4f}_{std_val:.4f}_{rms_val:.4f}"
                 else:
                     return f"audio_empty_{shape_str}"
             except:
                 return f"audio_{shape_str}_stats_error"
         return None
     
-    def extract_custom_voice_from_audio(self, audio_dict, use_cache=True):
-        """Extract voice embedding from audio with caching for performance."""
+    def extract_speaker_embedding(self, audio_dict, use_cache=True):
+        """
+        Extract voice embedding from audio with enhanced caching for performance.
+        Uses the exact technique from the WhisperSpeech pipeline implementation.
+        """
         pipe = self.get_whisper_pipeline()
         if pipe is None:
-            return None
+            return self.__class__.DEFAULT_SPEAKER if self.__class__.DEFAULT_SPEAKER is not None else None
             
         if audio_dict is None or not isinstance(audio_dict, dict):
-            print("Invalid custom voice audio input")
-            return None
+            logger.warning("Invalid custom voice audio input, using default speaker")
+            return self.__class__.DEFAULT_SPEAKER if self.__class__.DEFAULT_SPEAKER is not None else None
         
         # Check cache if enabled
         if use_cache:
             cache_key = self._generate_cache_key(audio_dict)
             if cache_key and cache_key in self.__class__.EMBEDDING_CACHE:
-                print(f"Using cached voice embedding")
+                logger.info("Using cached voice embedding")
                 return self.__class__.EMBEDDING_CACHE[cache_key]
             
         try:
@@ -128,8 +185,8 @@ class GeekyWhisperSpeechNode:
             sample_rate = audio_dict.get("sample_rate", 24000)
             
             if waveform is None:
-                print("Custom voice audio has no waveform")
-                return None
+                logger.error("Audio has no waveform, using default speaker")
+                return self.__class__.DEFAULT_SPEAKER if self.__class__.DEFAULT_SPEAKER is not None else None
                 
             # Ensure proper shape for torchaudio.save
             if waveform.dim() == 3:
@@ -145,15 +202,41 @@ class GeekyWhisperSpeechNode:
                 # Save to temporary file
                 torchaudio.save(audio_path, waveform.cpu(), sample_rate)
                 
-                # Extract speaker embedding
+                # Extract speaker embedding using the pipeline's method
                 start_time = time.time()
-                speaker_emb = pipe.extract_spk_emb(audio_path)
-                print(f"Voice embedding extracted in {time.time() - start_time:.2f} seconds")
+                
+                # Get audio info for proper duration limiting
+                audio_info = torchaudio.info(audio_path)
+                actual_sample_rate = audio_info.sample_rate
+                
+                # Limit to first 30 seconds for embedding extraction (exactly as in pipeline.py)
+                num_frames = actual_sample_rate * 30
+                
+                # Use SpeechBrain for consistent embedding extraction
+                if not hasattr(pipe, 'encoder') or pipe.encoder is None:
+                    device = pipe.device
+                    # Handle MPS incompatibility as in the original code
+                    if device == 'mps': device = 'cpu'
+                    from speechbrain.pretrained import EncoderClassifier
+                    pipe.encoder = EncoderClassifier.from_hparams(
+                        "speechbrain/spkrec-ecapa-voxceleb",
+                        savedir=expanduser("~/.cache/speechbrain/"),
+                        run_opts={"device": device}
+                    )
+                
+                # Load audio with proper frame limiting
+                samples, sr = torchaudio.load(audio_path, num_frames=num_frames)
+                samples = samples[:, :num_frames]
+                samples = pipe.encoder.audio_normalizer(samples[0], sr)
+                speaker_emb = pipe.encoder.encode_batch(samples.unsqueeze(0))
+                speaker_emb = speaker_emb[0,0].to(pipe.device)
+                
+                logger.info(f"Voice embedding extracted in {time.time() - start_time:.2f} seconds")
                 
                 # Cache the result if enabled
                 if use_cache and cache_key:
                     self.__class__.EMBEDDING_CACHE[cache_key] = speaker_emb
-                    print("Cached voice embedding for future use")
+                    logger.info("Cached voice embedding for future use")
                 
                 return speaker_emb
             finally:
@@ -164,344 +247,376 @@ class GeekyWhisperSpeechNode:
                     pass
                     
         except Exception as e:
-            print(f"Error extracting custom voice: {e}")
+            logger.error(f"Error extracting custom voice: {e}")
+            import traceback
+            traceback.print_exc()
+            return self.__class__.DEFAULT_SPEAKER if self.__class__.DEFAULT_SPEAKER is not None else None
+
+    def preprocess_text(self, text):
+        """
+        Preprocess text to handle common TTS issues like contractions and abbreviations.
+        This improves pronunciation quality in the generated speech.
+        """
+        # Normalize whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        # Common contractions that WhisperSpeech sometimes struggles with
+        contractions = {
+            r"won't": "will not",
+            r"can't": "cannot",
+            r"don't": "do not",
+            r"doesn't": "does not",
+            r"didn't": "did not",
+            r"isn't": "is not",
+            r"aren't": "are not",
+            r"wasn't": "was not",
+            r"weren't": "were not",
+            r"haven't": "have not",
+            r"hasn't": "has not",
+            r"hadn't": "had not",
+            r"it's": "it is",
+            r"we've": "we have",
+            r"they've": "they have",
+            r"who've": "who have",
+            r"shouldn't": "should not",
+            r"wouldn't": "would not",
+            r"couldn't": "could not",
+            r"they're": "they are",
+            r"we're": "we are",
+            r"you're": "you are",
+        }
+        
+        # Apply only the problematic contractions that cause issues
+        for contraction, expansion in contractions.items():
+            text = re.sub(r'\b' + contraction + r'\b', expansion, text, flags=re.IGNORECASE)
+        
+        # Expand certain abbreviations and symbols
+        text = re.sub(r'\bDr\.', 'Doctor', text)
+        text = re.sub(r'\bMr\.', 'Mister', text)
+        text = re.sub(r'\bMrs\.', 'Misses', text)
+        text = re.sub(r'\bMs\.', 'Miss', text)
+        text = re.sub(r'\bSt\.', 'Saint', text)
+        text = re.sub(r'\bCo\.', 'Company', text)
+        text = re.sub(r'\bJr\.', 'Junior', text)
+        text = re.sub(r'\bSr\.', 'Senior', text)
+        text = re.sub(r'\bvs\.', 'versus', text)
+        text = re.sub(r'&', 'and', text)
+        
+        # Add slight pause after period/comma if not followed by space
+        text = re.sub(r'\.([A-Za-z])', '. \1', text)
+        text = re.sub(r',([A-Za-z])', ', \1', text)
+        
+        # Ensure proper spacing for punctuation 
+        text = re.sub(r'\s+([.,;:!?])', r'\1', text)
+        
+        return text
+    
+    def smart_split_text(self, text, max_length=350, overlap_chars=50):
+        """
+        Advanced text chunking that preserves natural language boundaries with context overlap.
+        Now returns chunk metadata to prevent repetition of overlapping sections.
+        """
+        if len(text) <= max_length:
+            return [{"text": text, "render_start": 0, "render_end": len(text)}]
+        
+        # First, normalize the text for better processing
+        text = text.replace('\n', ' ').replace('\r', ' ')
+        text = re.sub(r'\s+', ' ', text).strip()
+        
+        # Define sentence boundary pattern - handle more edge cases
+        sentence_pattern = r'(?<=[.!?])\s+'
+        sentences = re.split(sentence_pattern, text)
+        
+        # If a sentence is very long, split it at punctuation or conjunctions
+        processed_sentences = []
+        for s in sentences:
+            s = s.strip()
+            if not s:
+                continue
+            
+            # Add period if missing sentence terminator
+            if not s.endswith(('.', '!', '?')):
+                s += '.'
+                
+            # Split very long sentences
+            if len(s) > max_length * 0.8:
+                # Try to split at commas, semicolons, or conjunctions
+                subparts = re.split(r'(?<=[,;])\s+|(?<=\s(and|but|or|because|however|moreover))\s+', s)
+                for part in subparts:
+                    if part.strip():
+                        processed_sentences.append(part.strip())
+            else:
+                processed_sentences.append(s)
+        
+        # Create chunks with context overlap, but track what should be rendered
+        chunks = []
+        current_chunk = ""
+        current_length = 0
+        absolute_position = 0  # Track position in original text
+        chunk_start_position = 0  # Position where current chunk starts in original text
+        
+        for sentence in processed_sentences:
+            sentence_len = len(sentence) + 1  # +1 for space
+            
+            # If adding this sentence would exceed max length and we already have content
+            if current_length + sentence_len > max_length and current_chunk:
+                # Add the current chunk to the list with absolute positions
+                chunks.append({
+                    "text": current_chunk.strip(),
+                    "absolute_start": chunk_start_position,
+                    "absolute_end": absolute_position - 1  # -1 for trailing space
+                })
+                
+                # Calculate overlap for next chunk
+                overlap_start = max(0, absolute_position - overlap_chars)
+                
+                # Extract overlap text from original text
+                overlap_text = text[overlap_start:absolute_position]
+                
+                # Start a new chunk with the overlap
+                current_chunk = overlap_text + " " + sentence + " "
+                current_length = len(overlap_text) + sentence_len + 1
+                
+                # Update chunk start position, accounting for overlap
+                chunk_start_position = overlap_start
+            else:
+                # Add to current chunk
+                current_chunk += sentence + " "
+                current_length += sentence_len
+                
+                # Set chunk_start_position only for the first sentence
+                if current_length == sentence_len:
+                    chunk_start_position = absolute_position
+            
+            # Update absolute position after adding the sentence
+            absolute_position += sentence_len
+        
+        # Add the final chunk if not empty
+        if current_chunk:
+            chunks.append({
+                "text": current_chunk.strip(),
+                "absolute_start": chunk_start_position,
+                "absolute_end": absolute_position - 1  # -1 for trailing space
+            })
+        
+        # Now add render boundaries to avoid repetition
+        chunks_with_boundaries = []
+        for i, chunk in enumerate(chunks):
+            if i == 0:
+                # First chunk renders everything
+                render_start = 0
+            else:
+                # Calculate where non-overlapping content starts
+                # This is the key to avoiding repetition
+                prev_end = chunks[i-1]["absolute_end"]
+                current_start = chunk["absolute_start"]
+                overlap_length = prev_end - current_start + 1
+                if overlap_length > 0:
+                    # Skip the overlapping text when rendering
+                    render_start = overlap_length
+                else:
+                    # No overlap (gap in text - shouldn't happen with our algorithm)
+                    render_start = 0
+            
+            # Add chunk with render boundaries
+            chunks_with_boundaries.append({
+                "text": chunk["text"],
+                "render_start": render_start,
+                "render_end": len(chunk["text"])
+            })
+        
+        logger.info(f"Split text into {len(chunks_with_boundaries)} chunks with non-repeating boundaries")
+        return chunks_with_boundaries
+    
+    def generate_speech_for_chunk(self, chunk_with_boundaries, voice_emb, pipe, device, cps=13.0, temperature=0.7, top_k=None):
+        """
+        Generate speech for a single text chunk with context, but only return the renderable portion.
+        This prevents repeating overlapping text between chunks.
+        """
+        try:
+            # Extract chunk text and render boundaries
+            chunk_text = chunk_with_boundaries["text"]
+            render_start = chunk_with_boundaries["render_start"]
+            render_end = chunk_with_boundaries["render_end"]
+            
+            # Generate audio for the full chunk (including context)
+            with self.inference_context():
+                # Generate speech tokens with specified character per second rate
+                speech_tokens = pipe.t2s.generate(chunk_text, cps=cps, show_progress_bar=False, T=temperature, top_k=top_k)[0]
+                speech_tokens = speech_tokens[speech_tokens != 512]  # Remove padding
+                
+                # Try to move to device if possible
+                if device == 'cuda' and torch.cuda.is_available():
+                    try:
+                        speech_tokens = speech_tokens.to(device)
+                        voice_emb_gpu = voice_emb.to(device)
+                    except Exception as e:
+                        logger.warning(f"Unable to move to GPU: {e}")
+                        voice_emb_gpu = voice_emb
+                else:
+                    voice_emb_gpu = voice_emb
+                    
+                # Generate audio tokens
+                audio_tokens = pipe.s2a.generate(
+                    speech_tokens,
+                    speakers=voice_emb_gpu.unsqueeze(0),
+                    show_progress_bar=False
+                )
+                
+                # Decode to audio
+                full_audio_wave = pipe.vocoder.decode(audio_tokens)
+                
+                # Ensure proper shape
+                full_audio_wave = full_audio_wave.squeeze()  # Remove any singleton dimensions
+                
+                # Calculate sample positions based on character positions
+                # This is an approximation - characters don't map linearly to audio samples
+                # but it's close enough for our purposes
+                total_chars = render_end - 0  # Full length of text
+                total_samples = full_audio_wave.shape[-1]
+                samples_per_char = total_samples / total_chars if total_chars > 0 else 0
+                
+                # Calculate sample positions for render boundaries
+                render_start_sample = int(render_start * samples_per_char)
+                render_end_sample = total_samples
+                
+                # Trim audio to only the renderable portion
+                if render_start_sample >= total_samples:
+                    logger.warning(f"Render start ({render_start_sample}) exceeds audio length ({total_samples}), returning full audio")
+                    trimmed_audio = full_audio_wave
+                else:
+                    trimmed_audio = full_audio_wave[render_start_sample:render_end_sample]
+                
+                if render_start > 0:
+                    logger.info(f"Trimmed {render_start} chars ({render_start_sample} samples) from chunk start to avoid repetition")
+                
+                return trimmed_audio
+            
+        except Exception as e:
+            logger.error(f"Error generating speech for chunk: {e}")
             import traceback
             traceback.print_exc()
             return None
     
-    def pad_short_text(self, text, min_length=10):
-        """Pad very short texts to ensure they generate proper speech."""
-        text = text.strip()
-        if len(text) >= min_length:
-            return text
-            
-        # For very short text, add padding to ensure proper generation
-        if not text.endswith(('.', '!', '?')):
-            text += '.'
-            
-        padding_needed = min_length - len(text)
-        if padding_needed > 0:
-            # Add padding that won't affect the meaning
-            padding = " " + "." * (padding_needed - 1)
-            print(f"Text is very short, adding minimal padding")
-            return text + padding
-        return text
-    
-    def smart_split_text(self, text, max_length=400, overlap_chars=40):
-        """
-        Split text into chunks with context overlap, preserving sentence structure.
-        This approach ensures consistent pacing and tone between chunks.
-        """
-        if len(text) <= max_length:
-            return [text]
-        
-        # First, normalize the text to simplify processing
-        text = text.replace('\n', ' ').replace('\r', ' ')
-        text = re.sub(r'\s+', ' ', text).strip()
-        
-        # Use a more sophisticated approach to split by sentences
-        # This regex finds sentence boundaries (., !, ? followed by a space or end of string)
-        sentence_pattern = r'(?<=[.!?])\s+'
-        sentences = re.split(sentence_pattern, text)
-        sentences = [s.strip() + '. ' for s in sentences if s.strip()]
-        
-        # Now create chunks with context overlap
-        chunks = []
-        current_chunk = ""
-        current_length = 0
-        
-        # Keep track of the last few sentences for overlap
-        last_sentences = []
-        
-        for sentence in sentences:
-            sentence_len = len(sentence)
-            
-            # If adding this sentence would exceed the max length and we already have content
-            if current_length + sentence_len > max_length and current_chunk:
-                # Add the current chunk to the list
-                chunks.append(current_chunk.strip())
-                
-                # Create overlap from the last few sentences
-                overlap_text = ""
-                overlap_len = 0
-                
-                # Build overlap from last sentences, but don't exceed overlap_chars
-                for prev_sentence in reversed(last_sentences):
-                    if overlap_len + len(prev_sentence) <= overlap_chars:
-                        overlap_text = prev_sentence + overlap_text
-                        overlap_len += len(prev_sentence)
-                    else:
-                        # If we can't fit the whole sentence, take what we can
-                        space_left = overlap_chars - overlap_len
-                        if space_left > 20:  # Only take a partial sentence if we can get a meaningful chunk
-                            words = prev_sentence.split()
-                            partial = []
-                            partial_len = 0
-                            for word in reversed(words):
-                                if partial_len + len(word) + 1 <= space_left:
-                                    partial.insert(0, word)
-                                    partial_len += len(word) + 1
-                                else:
-                                    break
-                            if partial:
-                                overlap_text = ' '.join(partial) + " " + overlap_text
-                        break
-                
-                # Start a new chunk with the overlap text
-                current_chunk = overlap_text + sentence
-                current_length = len(current_chunk)
-                
-                # Reset the last sentences tracking with current sentence
-                last_sentences = [sentence]
-            else:
-                # Add to current chunk
-                current_chunk += sentence
-                current_length += sentence_len
-                
-                # Keep track of last few sentences for potential overlap
-                last_sentences.append(sentence)
-                
-                # Limit the number of sentences we track to avoid excessive memory use
-                if len(last_sentences) > 5:
-                    last_sentences.pop(0)
-        
-        # Add the final chunk if not empty
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-        
-        # Handle long single sentences that exceed the max_length
-        if not chunks:
-            # Break the text into chunks of max_length with overlap
-            chunks = []
-            for i in range(0, len(text), max_length - overlap_chars):
-                if i > 0:
-                    # Start overlap_chars earlier to create the overlap
-                    start = max(0, i - overlap_chars)
-                else:
-                    start = 0
-                end = min(i + max_length, len(text))
-                chunks.append(text[start:end])
-        
-        print(f"Split text into {len(chunks)} chunks with context overlap")
-        return chunks
-    
-    def crossfade_audio_segments(self, segments, crossfade_ms=150, sample_rate=24000):
-        """
-        Combine audio segments with smooth crossfading, similar to Kokoro's approach.
-        Implements volume normalization and cubic easing for natural transitions.
-        """
-        if not segments:
-            return torch.zeros(1, dtype=torch.float32)
-        
-        if len(segments) == 1:
-            return segments[0]
-        
-        # Calculate crossfade samples
-        crossfade_samples = int(crossfade_ms * sample_rate / 1000)
-        
-        # Function to normalize a segment to consistent volume
-        def normalize_segment(segment):
-            max_amplitude = torch.max(torch.abs(segment))
-            if max_amplitude > 0:
-                # Normalize to 0.9 to allow headroom for crossfading
-                return segment * (0.9 / max_amplitude)
-            return segment
-        
-        # Normalize all segments for consistent volume
-        normalized_segments = [normalize_segment(seg) for seg in segments]
-        
-        # Calculate total output length
-        total_length = sum(seg.shape[-1] for seg in normalized_segments) - crossfade_samples * (len(normalized_segments) - 1)
-        
-        # Create output tensor
-        result = torch.zeros(total_length, dtype=normalized_segments[0].dtype, device=normalized_segments[0].device)
-        position = 0
-        
-        # Generate cubic easing curves for crossfading (smoother than linear)
-        def cubic_ease_out(t):
-            return 1 - (1 - t)**3
-            
-        def cubic_ease_in(t):
-            return t**3
-        
-        # Process each segment
-        for i, segment in enumerate(normalized_segments):
-            segment_len = segment.shape[-1]
-            
-            if i == 0:
-                # First segment - no crossfade at the beginning
-                end_pos = min(segment_len, result.shape[0])
-                result[:end_pos] = segment[:end_pos]
-                position = segment_len - crossfade_samples
-            else:
-                # Create smooth crossfade curves
-                t = torch.linspace(0, 1, crossfade_samples, device=segment.device)
-                fade_out = torch.tensor([1 - cubic_ease_in(x) for x in t], device=segment.device)
-                fade_in = torch.tensor([cubic_ease_out(x) for x in t], device=segment.device)
-                
-                # Apply crossfade
-                crossfade_end = min(position + crossfade_samples, result.shape[0])
-                samples_to_blend = crossfade_end - position
-                
-                if samples_to_blend > 0 and samples_to_blend <= crossfade_samples and samples_to_blend <= segment.shape[0]:
-                    result[position:crossfade_end] = (
-                        result[position:crossfade_end] * fade_out[:samples_to_blend] +
-                        segment[:samples_to_blend] * fade_in[:samples_to_blend]
-                    )
-                    
-                    # Add rest of the segment after crossfade
-                    remaining_start = position + samples_to_blend
-                    remaining_length = segment_len - samples_to_blend
-                    
-                    if remaining_length > 0 and remaining_start < result.shape[0]:
-                        end_pos = min(remaining_start + remaining_length, result.shape[0])
-                        samples_to_copy = end_pos - remaining_start
-                        result[remaining_start:end_pos] = segment[samples_to_blend:samples_to_blend+samples_to_copy]
-                
-                position += segment_len - crossfade_samples
-        
-        return result
-    
-    def generate_speech_for_chunk(self, text, voice_emb, pipe, device, cps=13.0):
-        """Generate speech for a single text chunk with consistent parameters."""
-        try:
-            # Generate speech tokens
-            speech_tokens = pipe.t2s.generate(text, cps=cps, show_progress_bar=False)[0]
-            speech_tokens = speech_tokens[speech_tokens != 512]  # Remove padding
-            
-            # Try to move to device if possible
-            if device == 'cuda' and torch.cuda.is_available():
-                try:
-                    speech_tokens = speech_tokens.to(device)
-                    voice_emb_gpu = voice_emb.to(device)
-                except Exception as e:
-                    print(f"Warning: Unable to move to GPU: {e}")
-                    voice_emb_gpu = voice_emb
-            else:
-                voice_emb_gpu = voice_emb
-                
-            # Generate audio tokens
-            audio_tokens = pipe.s2a.generate(
-                speech_tokens,
-                speakers=voice_emb_gpu.unsqueeze(0),
-                show_progress_bar=False
-            )
-            
-            # Decode to audio
-            audio_wave = pipe.vocoder.decode(audio_tokens)
-            
-            # Ensure proper shape
-            audio_wave = audio_wave.squeeze()  # Remove any singleton dimensions
-            
-            return audio_wave
-            
-        except Exception as e:
-            print(f"Error generating speech for chunk: {e}")
-            return None
-    
     def generate_speech(self, text, user_audio, enable_blending=False, 
                       second_voice=None, blend_ratio=0.5, output_volume=0.0,
-                      use_gpu=False, cache_embeddings=True, smart_chunking=True):
+                      use_gpu=True, cache_embeddings=True, smart_chunking=True,
+                      characters_per_second=13.0, temperature=0.7, max_chunk_size=350):
         """
-        Generate speech using WhisperSpeech with optimized performance.
+        Enhanced speech generation with overlap handling to prevent repetition.
         """
         # Default output in case of errors
         default_output = {"waveform": torch.zeros((1, 1, 1000), dtype=torch.float32), "sample_rate": 24000}
         
-        # Start timing
+        # Start timing for performance tracking
         total_start_time = time.time()
         
-        # Get the WhisperSpeech pipeline
+        # Get the properly configured WhisperSpeech pipeline
         pipe = self.get_whisper_pipeline(use_gpu)
         if pipe is None:
-            print("WhisperSpeech not available, returning default output")
+            logger.error("WhisperSpeech not available, returning default output")
             return default_output, text
         
         try:
-            # Pad very short texts to ensure proper generation
+            # Store original text for return value
             original_text = text
-            text = self.pad_short_text(text)
+            
+            # Preprocess text to improve pronunciation
+            text = self.preprocess_text(text)
             
             # Extract voice from user audio (with caching if enabled)
             embed_start = time.time()
-            user_voice_emb = self.extract_custom_voice_from_audio(user_audio, use_cache=cache_embeddings)
+            user_voice_emb = self.extract_speaker_embedding(user_audio, use_cache=cache_embeddings)
             if user_voice_emb is None:
-                print("Failed to extract voice from user audio")
+                logger.error("Failed to extract voice from user audio and no default speaker available")
                 return default_output, text
             
             # Handle voice blending if enabled
             if enable_blending and second_voice is not None:
-                second_voice_emb = self.extract_custom_voice_from_audio(second_voice, use_cache=cache_embeddings)
+                second_voice_emb = self.extract_speaker_embedding(second_voice, use_cache=cache_embeddings)
                 if second_voice_emb is not None:
-                    print(f"Blending voices with ratio {blend_ratio:.2f}")
+                    logger.info(f"Blending voices with ratio {blend_ratio:.2f}")
                     # Make sure they're on the same device
                     device = user_voice_emb.device
                     second_voice_emb = second_voice_emb.to(device)
                     
-                    # Simple linear blending
+                    # Linear blending of embeddings
                     voice_emb = user_voice_emb * blend_ratio + second_voice_emb * (1 - blend_ratio)
                 else:
-                    print("Failed to extract voice from second audio, using only user voice")
+                    logger.warning("Failed to extract voice from second audio, using only user voice")
                     voice_emb = user_voice_emb
             else:
                 voice_emb = user_voice_emb
             
-            print(f"Embedding preparation took {time.time() - embed_start:.2f} seconds")
+            logger.info(f"Embedding preparation took {time.time() - embed_start:.2f} seconds")
             
-            # Move to appropriate device if GPU is enabled
+            # Determine device for generation
             device = 'cuda' if use_gpu and torch.cuda.is_available() else 'cpu'
+            logger.info(f"Using device: {device} for generation")
             
-            # Generate speech - use different approach based on text length
+            # Generate speech with improved chunking strategy
             gen_start = time.time()
             
-            # Determine if we should use chunking
-            use_chunking = smart_chunking and len(text) > 500  # Only chunk long texts
+            # Determine if we should use chunking based on text length
+            use_chunking = smart_chunking and len(text) > max_chunk_size
+            
+            # Top-k parameter for sampling (prevents low-probability tokens)
+            top_k = 50 if temperature > 0.5 else None
             
             if use_chunking:
-                print(f"Processing long text ({len(text)} chars) using smart chunking")
+                logger.info(f"Processing long text ({len(text)} chars) using smart chunking")
                 
-                # Split text into chunks with context overlap
-                chunks = self.smart_split_text(text)
+                # Split text into chunks with overlap boundaries
+                chunks_with_boundaries = self.smart_split_text(text, max_length=max_chunk_size)
                 
                 # Process each chunk with consistent parameters
                 audio_segments = []
                 
-                for i, chunk in enumerate(chunks):
-                    print(f"Processing chunk {i+1}/{len(chunks)}: {chunk[:30]}...")
+                for i, chunk in enumerate(chunks_with_boundaries):
+                    chunk_text_preview = chunk["text"][chunk["render_start"]:chunk["render_end"]][:30] + "..."
+                    logger.info(f"Processing chunk {i+1}/{len(chunks_with_boundaries)}: {chunk_text_preview}")
                     chunk_start = time.time()
                     
-                    # Use consistent CPS value for all chunks
-                    cps_value = 13.0
+                    # Generate speech for this chunk with boundaries to prevent repetition
+                    audio_wave = self.generate_speech_for_chunk(
+                        chunk, voice_emb, pipe, device, 
+                        cps=characters_per_second,
+                        temperature=temperature,
+                        top_k=top_k
+                    )
                     
-                    # Generate speech for this chunk
-                    audio_wave = self.generate_speech_for_chunk(chunk, voice_emb, pipe, device, cps=cps_value)
-                    
-                    if audio_wave is not None:
+                    if audio_wave is not None and audio_wave.numel() > 0:
                         audio_segments.append(audio_wave)
-                        print(f"Chunk {i+1} processed in {time.time() - chunk_start:.2f} seconds")
+                        logger.info(f"Chunk {i+1} processed in {time.time() - chunk_start:.2f} seconds")
                     else:
-                        print(f"Failed to process chunk {i+1}, skipping")
+                        logger.warning(f"Failed to process chunk {i+1} or empty audio returned, skipping")
                 
-                # Combine segments with crossfading
+                # Combine segments with simple concatenation (no crossfade needed for non-overlapping segments)
                 if audio_segments:
-                    audio_wave = self.crossfade_audio_segments(audio_segments)
+                    # Simple concatenation is enough since we've already handled overlap
+                    audio_wave = torch.cat(audio_segments, dim=0)
                 else:
-                    print("No valid audio segments generated")
+                    logger.error("No valid audio segments generated")
                     audio_wave = torch.zeros(24000, dtype=torch.float32, device=device)  # 1 second of silence
             else:
-                print(f"Processing text as a single unit (length: {len(text)} chars)")
+                logger.info(f"Processing text as a single unit (length: {len(text)} chars)")
                 
-                # Adjust CPS based on text length for optimal results
-                cps = 13.0 if len(text) < 50 else 14.0
+                # Create a single chunk with full render boundaries
+                single_chunk = {"text": text, "render_start": 0, "render_end": len(text)}
                 
-                # Generate in a single pass
-                audio_wave = self.generate_speech_for_chunk(text, voice_emb, pipe, device, cps=cps)
+                # Generate in a single pass with specified parameters
+                audio_wave = self.generate_speech_for_chunk(
+                    single_chunk, voice_emb, pipe, device, 
+                    cps=characters_per_second,
+                    temperature=temperature,
+                    top_k=top_k
+                )
                 
                 if audio_wave is None:
-                    print("Failed to generate speech")
+                    logger.error("Failed to generate speech")
                     audio_wave = torch.zeros(24000, dtype=torch.float32, device=device)  # 1 second of silence
             
-            print(f"Speech generation took {time.time() - gen_start:.2f} seconds")
+            logger.info(f"Speech generation took {time.time() - gen_start:.2f} seconds")
             
             # Apply volume adjustment if needed
             if output_volume != 0.0:
@@ -509,9 +624,18 @@ class GeekyWhisperSpeechNode:
                 gain = 10.0 ** (output_volume / 20.0)
                 audio_wave = audio_wave * gain
                 
-                # Apply soft clipping if needed
+                # Apply soft clipping if needed to prevent distortion
                 if torch.max(torch.abs(audio_wave)) > 0.95:
-                    audio_wave = torch.tanh(audio_wave)
+                    audio_wave = torch.tanh(audio_wave * 0.6) / 0.6
+                    logger.info("Applied soft clipping to prevent distortion")
+            
+            # Apply final normalization to ensure good volume level
+            max_amp = torch.max(torch.abs(audio_wave))
+            if max_amp > 0:
+                # Target -1 dB peak
+                target_peak = 0.89
+                if max_amp > target_peak:
+                    audio_wave = audio_wave * (target_peak / max_amp)
             
             # Convert to format expected by ComfyUI - 3D tensor [1, 1, samples]
             if audio_wave.dim() == 0:  # Scalar tensor
@@ -532,14 +656,46 @@ class GeekyWhisperSpeechNode:
                 "sample_rate": 24000  # WhisperSpeech uses 24kHz
             }
             
-            print(f"Total processing completed in {time.time() - total_start_time:.2f} seconds")
+            logger.info(f"Total processing completed in {time.time() - total_start_time:.2f} seconds")
             return output_audio, original_text
             
         except Exception as e:
-            print(f"Error in speech generation: {e}")
+            logger.error(f"Error in speech generation: {e}")
             import traceback
             traceback.print_exc()
             return default_output, text
+
+    def logits_to_probs(self, logits, temperature=1.0, top_k=None):
+        """
+        Convert logits to probabilities with temperature scaling and top-k filtering.
+        Directly adapted from WhisperSpeech's inference.py for consistent token generation.
+        """
+        logits = logits / max(temperature, 1e-5)
+
+        if top_k is not None:
+            v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+            pivot = v.select(-1, -1).unsqueeze(-1)
+            logits = torch.where(logits < pivot, torch.tensor(-float("Inf"), device=logits.device), logits)
+
+        probs = torch.nn.functional.softmax(logits, dim=-1)
+        return probs
+
+    def multinomial_sample_one_no_sync(self, probs_sort):
+        """
+        Sample from multinomial distribution without CUDA synchronization.
+        Directly adapted from WhisperSpeech's inference.py.
+        """
+        q = torch.empty_like(probs_sort).exponential_(1)
+        return torch.argmax(probs_sort / q, dim=-1, keepdim=True).to(dtype=torch.int)
+
+    def sample(self, logits, temperature=1.0, top_k=None):
+        """
+        Sample from logits with temperature and top-k filtering.
+        Directly adapted from WhisperSpeech's inference.py.
+        """
+        probs = self.logits_to_probs(logits, temperature, top_k)
+        idx_next = self.multinomial_sample_one_no_sync(probs)
+        return idx_next
 
 
 # Node registration for ComfyUI
