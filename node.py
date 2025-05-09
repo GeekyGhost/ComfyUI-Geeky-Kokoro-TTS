@@ -443,13 +443,18 @@ class GeekyKokoroTTSNode:
                 use_gpu = False
         
         # Get voice code and pipeline
-        voice_code = self.VOICES[voice]
+        voice_code = voice
+        if voice in self.VOICES:
+            voice_code = self.VOICES[voice]
+            
         pipeline = self.PIPELINES[voice_code[0]]
         start_time = time.time()
         
         # Handle voice blending
         if enable_blending and second_voice and second_voice != voice:
-            second_code = self.VOICES[second_voice]
+            second_code = second_voice
+            if second_voice in self.VOICES:
+                second_code = self.VOICES[second_voice]
             pipeline2 = self.PIPELINES[second_code[0]]
             
             # Process with blended styles
