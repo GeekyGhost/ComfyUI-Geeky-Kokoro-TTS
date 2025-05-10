@@ -46,7 +46,7 @@ class GeekyKokoroTTSNode:
                     "multiline": True, 
                     "default": "Welcome to Geeky Kokoro TTS for ComfyUI. You can adjust voice parameters to customize the output."
                 }),
-                "voice": (list(cls.VOICES.keys()), {"default": "🇺🇸 🚺 Heart ❤️"}),
+                "voice": (list(cls.VOICES.keys().extend(cls.VOICES.values()), {"default": "🇺🇸 🚺 Heart ❤️"}),
                 "speed": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.1}),
                 "use_gpu": ("BOOLEAN", {"default": torch.cuda.is_available()}),
             },
