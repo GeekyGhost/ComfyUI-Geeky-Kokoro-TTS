@@ -1,6 +1,6 @@
 # 🔊 Geeky Kokoro TTS and Voice Mod for ComfyUI (Updated 2025)
 
-A powerful and feature-rich custom node collection for ComfyUI that integrates the **latest Kokoro TTS v0.19+ system** with advanced voice modification capabilities. This updated version features **improved text chunking**, **Python 3.12+ compatibility**, and follows **ComfyUI v3.49+ guidelines**.
+A powerful and feature-rich custom node collection for ComfyUI that integrates the **latest Kokoro TTS v0.19+ system** with advanced voice modification capabilities. This updated version features **improved text chunking**, **Python 3.12 and below compatibility**, and follows **ComfyUI v3.49+ guidelines**.
 
 ## 🆕 What's New in v2.0
 
@@ -306,5 +306,6 @@ We welcome contributions! Areas where help is needed:
 - **Issue Reporting**: Use GitHub Issues for bug reports and feature requests
 
 ---
+
 
 **Enjoy natural, high-quality text-to-speech with perfect text ordering! 🎉**
