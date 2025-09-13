@@ -95,6 +95,34 @@ def check_python_compatibility():
     return True
 
 
+def ask_user_choice(question, default_yes=True):
+    """
+    Ask user a yes/no question.
+    
+    Parameters:
+    -----------
+    question : str
+        Question to ask
+    default_yes : bool
+        Default answer if user just presses enter
+        
+    Returns:
+    --------
+    bool
+        True for yes, False for no
+    """
+    try:
+        default_str = "Y/n" if default_yes else "y/N"
+        response = input(f"{question} [{default_str}]: ").strip().lower()
+        
+        if not response:
+            return default_yes
+        
+        return response in ['y', 'yes']
+    except (KeyboardInterrupt, EOFError):
+        return default_yes
+
+
 def run_pip(args, desc=None):
     """
     Run pip with the specified arguments.
@@ -253,7 +281,7 @@ def find_comfyui_directory(script_dir):
     return None, None
 
 
-def setup_modern_directory_structure(comfy_dir, script_dir):
+def setup_modern_directory_structure(comfy_dir, script_dir, create_backup=None):
     """
     Set up the modern ComfyUI directory structure following v3.49+ conventions.
     
@@ -263,11 +291,13 @@ def setup_modern_directory_structure(comfy_dir, script_dir):
         ComfyUI directory
     script_dir : Path
         Installation script directory
+    create_backup : bool or None
+        Whether to create backup. If None, ask user interactively.
         
     Returns:
     --------
-    Path
-        Path to the node directory
+    tuple
+        (node_dir, backup_created)
     """
     print_step("Setting up modern directory structure")
     
@@ -279,13 +309,35 @@ def setup_modern_directory_structure(comfy_dir, script_dir):
     custom_nodes_dir.mkdir(exist_ok=True)
     models_dir.mkdir(parents=True, exist_ok=True)
     
+    backup_created = False
+    
     # Handle existing installation
     if node_dir.exists():
-        print_substep("Found existing installation - backing up")
-        backup_dir = custom_nodes_dir / "ComfyUI-Geeky-Kokoro-TTS.backup"
-        if backup_dir.exists():
-            shutil.rmtree(backup_dir)
-        shutil.copytree(node_dir, backup_dir)
+        print_substep("Found existing installation")
+        
+        # Ask user about backup if not specified
+        if create_backup is None:
+            create_backup = ask_user_choice(
+                "Create a backup of the existing installation?", 
+                default_yes=True
+            )
+        
+        if create_backup:
+            print_substep("Creating backup of existing installation")
+            backup_dir = custom_nodes_dir / "ComfyUI-Geeky-Kokoro-TTS.backup"
+            
+            # Remove old backup if exists
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir)
+            
+            # Create new backup
+            shutil.copytree(node_dir, backup_dir)
+            backup_created = True
+            print_substep(f"Backup created at: {backup_dir}")
+        else:
+            print_substep("Skipping backup creation")
+        
+        # Remove existing installation
         shutil.rmtree(node_dir)
     
     node_dir.mkdir(exist_ok=True)
@@ -298,7 +350,7 @@ def setup_modern_directory_structure(comfy_dir, script_dir):
     print_substep(f"Node files: {node_dir}")
     print_substep(f"Models: {models_dir}")
     
-    return node_dir
+    return node_dir, backup_created
 
 
 def copy_updated_files(script_dir, node_dir):
@@ -450,7 +502,8 @@ def main():
         return False
     
     # Set up directory structure following modern ComfyUI conventions
-    node_dir = setup_modern_directory_structure(comfy_dir, script_dir)
+    # Note: create_backup=None means ask user interactively
+    node_dir, backup_created = setup_modern_directory_structure(comfy_dir, script_dir, create_backup=None)
     
     # Install dependencies
     print_step("Installing Python dependencies")
@@ -469,6 +522,10 @@ def main():
     # Verify installation
     if not verify_installation(node_dir, comfy_dir):
         print_warning("Installation verification had issues.")
+        return False
+    
+    # Ask about backup cleanup
+    cleanup_backup_if_requested(comfy_dir, backup_created)
     
     # Final success message and instructions
     print_success("🎉 Geeky Kokoro TTS installation completed!")
