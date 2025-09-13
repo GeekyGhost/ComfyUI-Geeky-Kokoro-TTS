@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
-Installation script for the Geeky Kokoro TTS and Voice Mod nodes for ComfyUI.
-Handles dependency installation and file setup.
+Updated installation script for the Geeky Kokoro TTS and Voice Mod nodes for ComfyUI.
+Compatible with Python 3.12+ and ComfyUI v3.49+.
 """
 import os
 import sys
@@ -12,6 +12,7 @@ import platform
 import logging
 from pathlib import Path
 import urllib.request
+import json
 
 # Set up logging
 logging.basicConfig(
@@ -36,34 +37,62 @@ def is_linux():
     return platform.system() == "Linux"
 
 
+def get_python_version():
+    """Get current Python version info."""
+    version_info = sys.version_info
+    return f"{version_info.major}.{version_info.minor}.{version_info.micro}"
+
+
 def print_step(message):
     """Print a step message with formatting."""
     logger.info(message)
-    print("\n\033[1;34m==>\033[0m \033[1m{}\033[0m".format(message))
+    print(f"\n\033[1;34m==>\033[0m \033[1m{message}\033[0m")
 
 
 def print_substep(message):
     """Print a substep message with formatting."""
     logger.debug(message)
-    print("  \033[1;32m->\033[0m \033[1m{}\033[0m".format(message))
+    print(f"  \033[1;32m->\033[0m \033[1m{message}\033[0m")
 
 
 def print_error(message):
     """Print an error message with formatting."""
     logger.error(message)
-    print("\033[1;31mError: {}\033[0m".format(message))
+    print(f"\033[1;31mError: {message}\033[0m")
 
 
 def print_warning(message):
     """Print a warning message with formatting."""
     logger.warning(message)
-    print("\033[1;33mWarning: {}\033[0m".format(message))
+    print(f"\033[1;33mWarning: {message}\033[0m")
 
 
 def print_success(message):
     """Print a success message with formatting."""
     logger.info(message)
-    print("\033[1;32mSuccess: {}\033[0m".format(message))
+    print(f"\033[1;32mSuccess: {message}\033[0m")
+
+
+def check_python_compatibility():
+    """Check if Python version is compatible."""
+    version_info = sys.version_info
+    python_version = f"{version_info.major}.{version_info.minor}"
+    
+    print_step(f"Checking Python compatibility (current: {get_python_version()})")
+    
+    if version_info.major != 3:
+        print_error("Python 3.x is required for this installation.")
+        return False
+    
+    if version_info.minor < 9:
+        print_error("Python 3.9 or newer is required. Please upgrade your Python installation.")
+        return False
+    
+    if version_info.minor >= 15:
+        print_warning(f"Python {python_version} is very new and may have compatibility issues.")
+    
+    print_success(f"Python {python_version} is compatible with ComfyUI and Kokoro TTS.")
+    return True
 
 
 def run_pip(args, desc=None):
@@ -90,102 +119,94 @@ def run_pip(args, desc=None):
     pip_command.extend(args)
     
     try:
-        subprocess.check_call(pip_command)
+        result = subprocess.run(pip_command, capture_output=True, text=True, check=True)
         return True
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        print_error(f"pip command failed: {' '.join(pip_command)}")
+        if e.stdout:
+            print(f"stdout: {e.stdout}")
+        if e.stderr:
+            print(f"stderr: {e.stderr}")
         return False
 
 
-def download_file(url, destination):
+def install_kokoro_dependencies():
     """
-    Download a file from a URL to a destination.
-    
-    Parameters:
-    -----------
-    url : str
-        URL to download from
-    destination : Path
-        Destination path
-        
-    Returns:
-    --------
-    bool
-        True if successful, False otherwise
-    """
-    print_substep(f"Downloading {url} to {destination}")
-    try:
-        urllib.request.urlretrieve(url, destination)
-        return True
-    except Exception as e:
-        print_error(f"Failed to download {url}: {e}")
-        return False
-
-
-def install_audio_dependencies():
-    """
-    Install audio processing dependencies with proper handling of prerequisites.
+    Install Kokoro TTS and related dependencies with proper version management.
     
     Returns:
     --------
     bool
         True if all critical dependencies were installed, False otherwise
     """
-    print_step("Installing Audio Processing Dependencies")
+    print_step("Installing Kokoro TTS Dependencies")
     
-    # First, install core dependencies
-    base_dependencies = [
-        "numpy>=1.22.0", 
-        "scipy>=1.9.0"
-    ]
-    
-    base_success = True
-    for dep in base_dependencies:
-        if not run_pip(["install", dep], f"Installing {dep}"):
-            base_success = False
-            print_error(f"Failed to install critical dependency: {dep}")
-    
-    if not base_success:
-        print_error("Failed to install basic dependencies. Aborting.")
-        return False
-    
-    # Install numba (required for resampy)
-    numba_success = run_pip(["install", "numba>=0.56.0"], "Installing Numba (required for resampy)")
-    
-    # If numba install fails, try installing llvmlite first (numba dependency)
-    if not numba_success:
-        print_warning("Numba installation failed, trying to install llvmlite first...")
-        run_pip(["install", "llvmlite"], "Installing llvmlite")
-        numba_success = run_pip(["install", "numba>=0.56.0"], "Retrying Numba installation")
-    
-    # Install resampy with specific version
-    if numba_success:
-        resampy_success = run_pip(["install", "resampy==0.4.2"], "Installing resampy for high-quality audio processing")
-        if not resampy_success:
-            print_warning("Resampy installation failed. Some audio effects may use fallback methods.")
-    else:
-        print_warning("Numba installation failed. Audio effects will use fallback methods.")
-    
-    # Install librosa separately to avoid dependency issues
-    librosa_success = run_pip(["install", "librosa>=0.10.0"], "Installing librosa audio processing library")
-    if not librosa_success:
-        print_warning("Librosa installation failed. Will use basic fallback methods.")
-    
-    # Install other audio dependencies
-    audio_deps = [
+    # Core dependencies with version constraints for stability
+    core_dependencies = [
+        "torch>=2.0.0",  # PyTorch first for CUDA compatibility
+        "numpy>=1.22.0,<2.0.0",  # Numpy with upper bound for compatibility
+        "scipy>=1.9.0,<2.0.0",
+        "kokoro>=0.9.4",  # Latest Kokoro version
         "soundfile>=0.12.1",
         "tqdm>=4.64.0",
+        "einops>=0.6.0",
     ]
     
-    for dep in audio_deps:
-        run_pip(["install", dep], f"Installing {dep}")
+    core_success = True
+    for dep in core_dependencies:
+        if not run_pip(["install", "--upgrade", dep], f"Installing {dep}"):
+            print_error(f"Failed to install critical dependency: {dep}")
+            core_success = False
     
-    print_success("Audio processing dependencies installation completed")
+    if not core_success:
+        print_error("Failed to install core dependencies.")
+        return False
+    
     return True
+
+
+def install_audio_dependencies():
+    """
+    Install audio processing dependencies with better error handling.
+    
+    Returns:
+    --------
+    bool
+        True if audio dependencies were installed, False otherwise
+    """
+    print_step("Installing Audio Processing Dependencies")
+    
+    # Check for existing installations first
+    audio_deps = [
+        ("librosa", "librosa>=0.10.0"),
+        ("resampy", "resampy>=0.4.3"),
+    ]
+    
+    success = True
+    
+    for package_name, pip_spec in audio_deps:
+        try:
+            # Try importing to see if already installed
+            __import__(package_name)
+            print_substep(f"{package_name} already available")
+        except ImportError:
+            # Need to install
+            if package_name == "resampy":
+                # Resampy often needs numba, install it first
+                print_substep("Installing numba (required for resampy)")
+                if not run_pip(["install", "numba>=0.56.0"], "Installing numba"):
+                    print_warning("Numba installation failed. Resampy may not work properly.")
+                
+            if not run_pip(["install", pip_spec], f"Installing {package_name}"):
+                print_warning(f"{package_name} installation failed. Some audio effects may use fallback methods.")
+                success = False
+    
+    return success
 
 
 def find_comfyui_directory(script_dir):
     """
-    Find the ComfyUI installation directory.
+    Find the ComfyUI installation directory with improved detection.
     
     Parameters:
     -----------
@@ -197,33 +218,44 @@ def find_comfyui_directory(script_dir):
     tuple
         (comfy_parent, comfy_dir) or (None, None) if not found
     """
-    # Determine if this is being run within the ComfyUI directory structure
-    comfy_parent = None
+    print_step("Locating ComfyUI installation")
+    
     current_dir = script_dir
     
-    # Check up to 5 directory levels up
-    for _ in range(5):
+    # Check up to 6 directory levels up
+    for level in range(6):
+        print_substep(f"Checking directory level {level}: {current_dir}")
+        
         # Check if this is the parent of a ComfyUI installation
-        if (current_dir / "ComfyUI").exists() and (current_dir / "ComfyUI" / "main.py").exists():
-            comfy_parent = current_dir
-            comfy_dir = current_dir / "ComfyUI"
-            return comfy_parent, comfy_dir
+        comfyui_subdir = current_dir / "ComfyUI"
+        if comfyui_subdir.exists() and (comfyui_subdir / "main.py").exists():
+            print_success(f"Found ComfyUI installation at: {comfyui_subdir}")
+            return current_dir, comfyui_subdir
         
         # Check if this is a ComfyUI installation itself
         if (current_dir / "main.py").exists() and (current_dir / "nodes").exists():
-            comfy_parent = current_dir.parent
-            comfy_dir = current_dir
-            return comfy_parent, comfy_dir
+            print_success(f"Found ComfyUI root at: {current_dir}")
+            return current_dir.parent, current_dir
+        
+        # Check for ComfyUI portable structure
+        if (current_dir.name.startswith("ComfyUI") and 
+            (current_dir / "ComfyUI" / "main.py").exists()):
+            comfyui_dir = current_dir / "ComfyUI"
+            print_success(f"Found ComfyUI portable at: {comfyui_dir}")
+            return current_dir, comfyui_dir
         
         # Move up one directory level
+        if current_dir.parent == current_dir:  # Reached filesystem root
+            break
         current_dir = current_dir.parent
     
+    print_error("Could not locate ComfyUI installation")
     return None, None
 
 
-def setup_kokoro_directory(comfy_dir, script_dir):
+def setup_modern_directory_structure(comfy_dir, script_dir):
     """
-    Set up the Geeky Kokoro TTS directory structure.
+    Set up the modern ComfyUI directory structure following v3.49+ conventions.
     
     Parameters:
     -----------
@@ -235,52 +267,49 @@ def setup_kokoro_directory(comfy_dir, script_dir):
     Returns:
     --------
     Path
-        Path to the Kokoro directory
+        Path to the node directory
     """
-    custom_nodes_dir = comfy_dir / "custom_nodes"
-    kokoro_dir = custom_nodes_dir / "geeky_kokoro_tts"
+    print_step("Setting up modern directory structure")
     
-    # Create custom_nodes directory if it doesn't exist
-    if not custom_nodes_dir.exists():
-        print_substep("Creating custom_nodes directory")
-        custom_nodes_dir.mkdir(exist_ok=True)
+    custom_nodes_dir = comfy_dir / "custom_nodes"
+    node_dir = custom_nodes_dir / "ComfyUI-Geeky-Kokoro-TTS"
+    models_dir = comfy_dir / "models" / "kokoro_tts"
+    
+    # Create directories
+    custom_nodes_dir.mkdir(exist_ok=True)
+    models_dir.mkdir(parents=True, exist_ok=True)
     
     # Handle existing installation
-    if kokoro_dir.exists():
-        print_substep("Updating existing geeky_kokoro_tts directory")
-        
-        # Preserve the models directory if it exists
-        model_dir = kokoro_dir / "models"
-        if model_dir.exists():
-            print_substep("Preserving existing model files")
-            temp_model_dir = comfy_dir / "temp_models"
-            if temp_model_dir.exists():
-                shutil.rmtree(temp_model_dir)
-            shutil.copytree(model_dir, temp_model_dir)
-        
-        # Clear the directory except for models
-        for item in kokoro_dir.iterdir():
-            if item.name != "models" and item.name != "temp_models":
-                if item.is_dir():
-                    shutil.rmtree(item)
-                else:
-                    item.unlink()
-    else:
-        print_substep("Creating geeky_kokoro_tts directory")
-        kokoro_dir.mkdir(exist_ok=True)
+    if node_dir.exists():
+        print_substep("Found existing installation - backing up")
+        backup_dir = custom_nodes_dir / "ComfyUI-Geeky-Kokoro-TTS.backup"
+        if backup_dir.exists():
+            shutil.rmtree(backup_dir)
+        shutil.copytree(node_dir, backup_dir)
+        shutil.rmtree(node_dir)
     
-    return kokoro_dir
+    node_dir.mkdir(exist_ok=True)
+    
+    # Create a symlink or info file for model directory
+    model_info = node_dir / "model_location.txt"
+    model_info.write_text(f"Models are stored in: {models_dir}")
+    
+    print_success(f"Directory structure created:")
+    print_substep(f"Node files: {node_dir}")
+    print_substep(f"Models: {models_dir}")
+    
+    return node_dir
 
 
-def copy_node_files(script_dir, kokoro_dir):
+def copy_updated_files(script_dir, node_dir):
     """
-    Copy node implementation files to the installation directory.
+    Copy updated node implementation files.
     
     Parameters:
     -----------
     script_dir : Path
         Source directory (script location)
-    kokoro_dir : Path
+    node_dir : Path
         Destination directory
         
     Returns:
@@ -288,163 +317,184 @@ def copy_node_files(script_dir, kokoro_dir):
     bool
         True if all required files were copied, False otherwise
     """
-    print_step("Installing Geeky Kokoro TTS and Voice Mod nodes")
+    print_step("Installing updated node files")
     
-    # Required node files to copy
-    node_files = {
-        "node.py": script_dir / "node.py",
-        "__init__.py": script_dir / "__init__.py",
-        "requirements.txt": script_dir / "requirements.txt",
-        "README.md": script_dir / "README.md",
-        "GeekyKokoroVoiceModNode.py": script_dir / "GeekyKokoroVoiceModNode.py",
-        "audio_utils.py": script_dir / "audio_utils.py",
-        "voice_profiles_utils.py": script_dir / "voice_profiles_utils.py"
+    # Required files with their descriptions
+    required_files = {
+        "node.py": "Main TTS node implementation",
+        "__init__.py": "Node initialization",
+        "requirements.txt": "Python dependencies",
+        "pyproject.toml": "Project configuration",
+        "README.md": "Documentation",
+        "GeekyKokoroVoiceModNode.py": "Voice modification node",
+        "audio_utils.py": "Audio processing utilities", 
+        "voice_profiles_utils.py": "Voice profile utilities",
+        "LICENSE": "License file"
     }
     
     success = True
+    copied_files = []
     missing_files = []
     
-    for dest_name, source_path in node_files.items():
-        dest_path = kokoro_dir / dest_name
+    for filename, description in required_files.items():
+        source_path = script_dir / filename
+        dest_path = node_dir / filename
         
-        # Copy if file exists, otherwise log error
         if source_path.exists():
-            shutil.copy2(source_path, dest_path)
-            print_substep(f"Copied {dest_name} to {dest_path}")
+            try:
+                shutil.copy2(source_path, dest_path)
+                print_substep(f"✓ {filename} ({description})")
+                copied_files.append(filename)
+            except Exception as e:
+                print_error(f"Failed to copy {filename}: {e}")
+                success = False
         else:
-            missing_files.append(dest_name)
-            success = False
+            print_warning(f"Missing: {filename} ({description})")
+            missing_files.append(filename)
     
     if missing_files:
-        print_warning(f"Could not find these files: {', '.join(missing_files)}")
-        print_warning("Some functionality may be limited.")
+        print_warning(f"Missing files: {', '.join(missing_files)}")
+        if len(missing_files) > len(copied_files):
+            success = False
     
+    print_success(f"Copied {len(copied_files)} files successfully")
     return success
 
 
-def setup_model_files(comfy_dir, kokoro_dir):
+def verify_installation(node_dir, comfy_dir):
     """
-    Set up model files, either by restoring from temp or downloading.
+    Verify the installation is correct and provide setup guidance.
     
     Parameters:
     -----------
+    node_dir : Path
+        Node installation directory
     comfy_dir : Path
         ComfyUI directory
-    kokoro_dir : Path
-        Kokoro installation directory
         
     Returns:
     --------
     bool
-        True if models are available, False otherwise
+        True if installation looks good, False otherwise
     """
-    print_step("Setting up Kokoro model files")
+    print_step("Verifying installation")
     
-    model_dir = kokoro_dir / "models"
+    # Check critical files
+    critical_files = ["node.py", "__init__.py", "requirements.txt"]
+    missing_critical = []
     
-    # Restore models from temp directory if it exists
-    temp_model_dir = comfy_dir / "temp_models"
-    if temp_model_dir.exists():
-        print_substep("Restoring preserved model files")
-        if model_dir.exists():
-            shutil.rmtree(model_dir)
-        shutil.copytree(temp_model_dir, model_dir)
-        shutil.rmtree(temp_model_dir)
+    for filename in critical_files:
+        if not (node_dir / filename).exists():
+            missing_critical.append(filename)
+    
+    if missing_critical:
+        print_error(f"Missing critical files: {', '.join(missing_critical)}")
+        return False
+    
+    # Check Python imports
+    try:
+        # Add the node directory to sys.path temporarily
+        import sys
+        sys.path.insert(0, str(node_dir))
+        
+        # Try importing kokoro to verify it's working
+        import kokoro
+        print_substep(f"✓ Kokoro TTS version: {kokoro.__version__ if hasattr(kokoro, '__version__') else 'imported successfully'}")
+        
+        # Remove from path
+        sys.path.remove(str(node_dir))
+        
+    except ImportError as e:
+        print_warning(f"Kokoro import test failed: {e}")
+        print_warning("This may be normal if ComfyUI uses a different Python environment")
+    
+    # Check models directory
+    models_dir = comfy_dir / "models" / "kokoro_tts"
+    if models_dir.exists():
+        print_substep(f"✓ Models directory: {models_dir}")
     else:
-        model_dir.mkdir(exist_ok=True)
+        print_substep(f"? Models directory will be created: {models_dir}")
     
-    # Check model files
-    model_file = model_dir / "kokoro-v1.0.onnx"
-    voices_file = model_dir / "voices-v1.0.bin"
-    
-    # Model URLs
-    model_url = "https://github.com/nazdridoy/kokoro-tts/releases/download/v1.0.0/kokoro-v1.0.onnx"
-    voices_url = "https://github.com/nazdridoy/kokoro-tts/releases/download/v1.0.0/voices-v1.0.bin"
-    
-    # Download model file if missing
-    if not model_file.exists():
-        print_substep("Model file not found. Downloading...")
-        if not download_file(model_url, model_file):
-            print_warning("Failed to download model file. You will need to download it manually.")
-            return False
-    else:
-        print_substep("Model file already exists. Skipping download.")
-    
-    # Download voices file if missing
-    if not voices_file.exists():
-        print_substep("Voices file not found. Downloading...")
-        if not download_file(voices_url, voices_file):
-            print_warning("Failed to download voices file. You will need to download it manually.")
-            return False
-    else:
-        print_substep("Voices file already exists. Skipping download.")
-    
+    print_success("Installation verification completed")
     return True
 
 
 def main():
     """
-    Main installation function.
+    Main installation function with modern ComfyUI support.
     
     Returns:
     --------
     bool
         True if installation succeeded, False otherwise
     """
+    print_step("Starting Geeky Kokoro TTS installation for ComfyUI v3.49+")
+    
+    # Check Python compatibility first
+    if not check_python_compatibility():
+        return False
+    
     # Get the script directory
     script_dir = Path(__file__).resolve().parent
+    print_substep(f"Installation script location: {script_dir}")
     
     # Find ComfyUI installation
     comfy_parent, comfy_dir = find_comfyui_directory(script_dir)
     
     if not comfy_dir:
-        print_error("Could not find ComfyUI installation. Please run this script from within your ComfyUI directory structure.")
-        print_warning("If you haven't installed ComfyUI yet, please do so first.")
-        print_warning("You can also manually specify the ComfyUI path by editing this script.")
+        print_error("Could not find ComfyUI installation.")
+        print_error("Please ensure this script is run from within your ComfyUI directory structure.")
+        print_error("Supported locations:")
+        print_error("  - ComfyUI/custom_nodes/ComfyUI-Geeky-Kokoro-TTS/")
+        print_error("  - ComfyUI_windows_portable/ComfyUI/custom_nodes/ComfyUI-Geeky-Kokoro-TTS/")
         return False
     
-    print_step(f"Found ComfyUI installation at: {comfy_dir}")
-    
-    # Set up the Kokoro directory
-    kokoro_dir = setup_kokoro_directory(comfy_dir, script_dir)
-    
-    # Copy node files
-    if not copy_node_files(script_dir, kokoro_dir):
-        print_warning("Some node files could not be copied. Installation may be incomplete.")
+    # Set up directory structure following modern ComfyUI conventions
+    node_dir = setup_modern_directory_structure(comfy_dir, script_dir)
     
     # Install dependencies
-    print_step("Installing required dependencies")
+    print_step("Installing Python dependencies")
     
-    # Standard Kokoro TTS dependencies
-    core_dependencies = [
-        "kokoro>=0.8.4",
-        "torch>=2.0.0",
-        "einops>=0.6.0"
-    ]
+    if not install_kokoro_dependencies():
+        print_error("Failed to install core dependencies. Installation aborted.")
+        return False
     
-    for dep in core_dependencies:
-        run_pip(["install", dep], f"Installing {dep}")
+    # Install audio dependencies (optional for full functionality)
+    install_audio_dependencies()
     
-    # Install audio dependencies with better error handling
-    if not install_audio_dependencies():
-        print_warning("Some audio processing features may not be available.")
+    # Copy node files
+    if not copy_updated_files(script_dir, node_dir):
+        print_warning("Some files could not be copied. Installation may be incomplete.")
     
-    # Set up model files
-    if not setup_model_files(comfy_dir, kokoro_dir):
-        print_warning("Model files may be missing. Basic functionality might be limited.")
+    # Verify installation
+    if not verify_installation(node_dir, comfy_dir):
+        print_warning("Installation verification had issues.")
     
-    print_success("Geeky Kokoro TTS node for ComfyUI has been installed successfully!")
-    print_success(f"Node files installed at: {kokoro_dir}")
-    print_success("Restart ComfyUI to use the new nodes.")
+    # Final success message and instructions
+    print_success("🎉 Geeky Kokoro TTS installation completed!")
+    print_success(f"Node installed at: {node_dir}")
+    print_success("Next steps:")
+    print_substep("1. Restart ComfyUI completely")
+    print_substep("2. Look for '🔊 Geeky Kokoro TTS (Updated)' in the node menu")
+    print_substep("3. Models will be downloaded automatically on first use")
+    print_substep("4. Check the console for any error messages")
+    
+    if comfy_parent.name.lower().startswith("comfyui"):
+        print_substep("5. For portable installations, models are cached in your user directory")
     
     return True
 
 
 if __name__ == "__main__":
     try:
-        main()
+        success = main()
+        if not success:
+            sys.exit(1)
+    except KeyboardInterrupt:
+        print_error("\nInstallation cancelled by user.")
+        sys.exit(1)
     except Exception as e:
-        print_error(f"Installation failed: {e}")
+        print_error(f"Installation failed with unexpected error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)
