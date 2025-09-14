@@ -130,10 +130,10 @@ class GeekyKokoroAdvancedVoiceNode:
         return original_audio * (1 - blend_factor) + processed_audio * blend_factor
     
     def process_voice(self, audio, effect_blend=1.0, output_volume=0.0,
-                     voice_profile="None", profile_intensity=0.7, manual_mode=False,
-                     pitch_shift=0.0, formant_shift=0.0, reverb_amount=0.0, echo_delay=0.0,
-                     distortion=0.0, compression=0.0, eq_bass=0.0, eq_mid=0.0, eq_treble=0.0,
-                     use_gpu=False):
+                      voice_profile="None", profile_intensity=0.7, manual_mode=False,
+                      pitch_shift=0.0, formant_shift=0.0, reverb_amount=0.0, echo_delay=0.0,
+                      distortion=0.0, compression=0.0, eq_bass=0.0, eq_mid=0.0, eq_treble=0.0,
+                      use_gpu=False):
         """
         Process audio with voice effects.
         
@@ -201,6 +201,15 @@ class GeekyKokoroAdvancedVoiceNode:
             
             original_length = waveform.shape[-1]
             audio_data = waveform.squeeze(0).squeeze(0).cpu().numpy().astype(np.float32)
+
+            # NEW: ensure 1-D mono for processing (collapse channels if present)
+            if audio_data.ndim == 2:
+                # audio_data is [C, T] → mix down to mono [T]
+                audio_data = audio_data.mean(axis=0).astype(np.float32, copy=False)
+            elif audio_data.ndim > 2:
+                # safety: flatten any unexpected shape to [T]
+                audio_data = np.asarray(audio_data, dtype=np.float32).reshape(-1)
+
             self.debug_audio_stats(audio_data, "input_audio")
             
             # Make copies for processing
@@ -263,12 +272,15 @@ class GeekyKokoroAdvancedVoiceNode:
                 gain = 10.0 ** (output_volume / 20.0)
                 result = original_audio.copy() * gain
             
-            # Length adjustment
-            if len(result) != original_length:
-                if len(result) > original_length:
+            # Length adjustment (use last axis size, not len() which breaks on 2-D)
+            cur_len = int(result.shape[-1])
+            if cur_len != original_length:
+                if cur_len > original_length:
                     result = result[:original_length]
                 else:
-                    result = np.pad(result, (0, original_length - len(result)), mode='constant')
+                    result = np.pad(result.astype(np.float32, copy=False),
+                                    (0, original_length - cur_len),
+                                    mode='constant')
                 self.debug_audio_stats(result, "after_length_adjustment")
             
             # Soft clipping to reduce distortion
