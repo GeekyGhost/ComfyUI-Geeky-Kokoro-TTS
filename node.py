@@ -37,6 +37,7 @@ class GeekyKokoroTTSNode:
     MODEL = None
     PIPELINES = {}
     VOICES = {}
+    AVAILABLE_VOICES = {}  # Track successfully loaded voices
     MODEL_LOCK = threading.Lock()
     INITIALIZED = False
 
@@ -46,19 +47,23 @@ class GeekyKokoroTTSNode:
         if not cls.INITIALIZED:
             cls._initialize()
 
+        # Use only successfully loaded voices
+        available_voices = list(cls.AVAILABLE_VOICES.keys()) if cls.AVAILABLE_VOICES else ["🇺🇸 🚺 Heart ❤️"]
+        default_voice = available_voices[0] if available_voices else "🇺🇸 🚺 Heart ❤️"
+
         return {
             "required": {
                 "text": ("STRING", {
                     "multiline": True,
                     "default": "Welcome to Geeky Kokoro TTS with complete voice support across 9 languages and 54+ voices!"
                 }),
-                "voice": (list(cls.VOICES.keys()), {"default": "🇺🇸 🚺 Heart ❤️"}),
+                "voice": (available_voices, {"default": default_voice}),
                 "speed": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.1}),
                 "use_gpu": ("BOOLEAN", {"default": torch.cuda.is_available()}),
             },
             "optional": {
                 "enable_blending": ("BOOLEAN", {"default": False}),
-                "second_voice": (list(cls.VOICES.keys()) if cls.VOICES else ["🇺🇸 🚺 Sarah"], {"default": "🇺🇸 🚺 Sarah"}),
+                "second_voice": (available_voices, {"default": default_voice}),
                 "blend_ratio": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.1, "display": "slider"}),
             }
         }
@@ -208,15 +213,18 @@ class GeekyKokoroTTSNode:
             if 'b' in cls.PIPELINES:
                 cls.PIPELINES['b'].g2p.lexicon.golds['kokoro'] = 'kˈQkəɹQ'
 
-            # Load voice data with error handling
+            # Load voice data with error handling and track successful loads
             for voice_name, voice_code in cls.VOICES.items():
                 try:
                     lang_code = voice_code[0]
                     if lang_code in cls.PIPELINES:
                         cls.PIPELINES[lang_code].load_voice(voice_code)
+                        # Only add to available voices if successfully loaded
+                        cls.AVAILABLE_VOICES[voice_name] = voice_code
                         logger.debug(f"Loaded voice: {voice_name} ({voice_code})")
                 except Exception as e:
-                    logger.warning(f"Failed to load voice {voice_name} ({voice_code}): {e}")
+                    # Log as debug instead of warning to reduce console spam for known missing voices
+                    logger.debug(f"Skipping voice {voice_name} ({voice_code}): {e}")
                     continue
 
             # Initialize model with proper device management
@@ -230,7 +238,12 @@ class GeekyKokoroTTSNode:
                         logger.info("CUDA available. GPU model will be loaded on demand.")
 
             cls.INITIALIZED = True
-            logger.info(f"Kokoro TTS initialization completed successfully with {len(cls.VOICES)} voices.")
+            total_voices = len(cls.VOICES)
+            loaded_voices = len(cls.AVAILABLE_VOICES)
+            logger.info(f"Kokoro TTS initialization completed successfully with {loaded_voices}/{total_voices} voices available.")
+
+            if loaded_voices < total_voices:
+                logger.info(f"Note: {total_voices - loaded_voices} voices were not loaded (missing dependencies or model files not yet available)")
 
         except Exception as e:
             logger.error(f"Initialization error: {e}")
@@ -479,7 +492,7 @@ class GeekyKokoroTTSNode:
         if not self.INITIALIZED:
             self._initialize()
 
-        if not KOKORO_AVAILABLE or not self.VOICES:
+        if not KOKORO_AVAILABLE or not self.AVAILABLE_VOICES:
             logger.error("Kokoro TTS not available or no voices loaded")
             silent_audio = torch.zeros((1, 1, 1000), dtype=torch.float32)
             return {"waveform": silent_audio, "sample_rate": 24000}, text
@@ -490,10 +503,11 @@ class GeekyKokoroTTSNode:
 
         processed_text = text.strip()
 
-        voice_code = self.VOICES.get(voice)
+        voice_code = self.AVAILABLE_VOICES.get(voice)
         if not voice_code:
             logger.error(f"Voice {voice} not found. Using default.")
-            voice_code = 'af_heart'
+            # Get the first available voice as default
+            voice_code = list(self.AVAILABLE_VOICES.values())[0] if self.AVAILABLE_VOICES else 'af_heart'
 
         pipeline = self.PIPELINES.get(voice_code[0])
         if not pipeline:
@@ -505,8 +519,8 @@ class GeekyKokoroTTSNode:
 
         try:
             # Handle voice blending
-            if enable_blending and second_voice and second_voice != voice and second_voice in self.VOICES:
-                second_code = self.VOICES[second_voice]
+            if enable_blending and second_voice and second_voice != voice and second_voice in self.AVAILABLE_VOICES:
+                second_code = self.AVAILABLE_VOICES[second_voice]
                 pipeline2 = self.PIPELINES.get(second_code[0])
 
                 if pipeline2:

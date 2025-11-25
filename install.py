@@ -283,6 +283,55 @@ def install_audio_dependencies():
     return all_success
 
 
+def install_language_dependencies():
+    """
+    Install language-specific dependencies for Japanese and Chinese TTS.
+    These are optional but required for Japanese and Chinese voice support.
+
+    Returns:
+    --------
+    bool
+        True if installation succeeded, False otherwise
+    """
+    print_step("Installing language-specific dependencies (optional)")
+    print_substep("For Japanese and Chinese language support")
+
+    python_exe = find_python_executable()
+
+    language_packages = [
+        "pyopenjtalk>=0.3.0",  # Japanese
+        "ordered-set>=4.1.0",   # Chinese
+    ]
+
+    all_success = True
+    for package in language_packages:
+        print_substep(f"Installing {package}...")
+        try:
+            result = subprocess.run(
+                [python_exe, "-m", "pip", "install", package, "--no-warn-script-location"],
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
+            if result.returncode != 0:
+                lang = "Japanese" if "pyopenjtalk" in package else "Chinese"
+                print_warning(f"Failed to install {package} - {lang} voices will not be available")
+                all_success = False
+            else:
+                print_success(f"Installed {package}")
+        except Exception as e:
+            lang = "Japanese" if "pyopenjtalk" in package else "Chinese"
+            print_warning(f"Error installing {package}: {e} - {lang} voices will not be available")
+            all_success = False
+
+    if all_success:
+        print_success("All language dependencies installed successfully")
+    else:
+        print_warning("Some language dependencies failed - Japanese or Chinese voices may not work")
+
+    return all_success
+
+
 def copy_updated_files(source_dir, target_dir):
     """
     Copy node files to the target directory.
@@ -439,6 +488,9 @@ def main():
 
     # Install audio dependencies (optional for full functionality)
     install_audio_dependencies()
+
+    # Install language-specific dependencies (optional for Japanese/Chinese)
+    install_language_dependencies()
 
     # Copy node files (only if needed)
     if node_dir != script_dir:
