@@ -21,11 +21,15 @@
 ### Key Features
 - ✅ ALL 54+ Kokoro-82M voices (nothing left out!)
 - ✅ Voice blending with linear interpolation
+- ✅ **NEW: Guided Voice Morphing** - Use any audio file to guide voice transformation
+- ✅ **NEW: Autotune-style Pitch Correction** - Match pitch to reference audio
+- ✅ **NEW: Advanced Spectral Morphing** - Match tone, timbre, and character
+- ✅ **NEW: 18 Voice Profiles** - Professional presets for instant transformations
 - ✅ Advanced voice modification effects (pitch, formant, reverb, etc.)
 - ✅ Intelligent text chunking that preserves sentence order
 - ✅ GPU acceleration with automatic CPU fallback
 - ✅ Multi-language support with proper phoneme handling
-- ✅ Professional audio processing pipeline
+- ✅ Professional audio processing pipeline with Dynamic Time Warping
 - ✅ ComfyUI v3.49+ compatibility
 
 ## 📋 Table of Contents
@@ -34,6 +38,7 @@
 - [Complete Voice List](#-complete-voice-list-54-voices)
 - [Usage Guide](#-usage-guide)
 - [Voice Blending](#-voice-blending)
+- [Guided Voice Morphing (NEW!)](#-guided-voice-morphing-new)
 - [Voice Modification Effects](#-voice-modification-effects)
 - [Technical Details](#-technical-details)
 - [Troubleshooting](#-troubleshooting)
@@ -252,11 +257,118 @@ Voice blending allows you to create unique vocal characteristics by mixing two v
 - Try `Michael + Adam` at 0.5 for rich, authoritative voice
 - Experiment with ratios to find your perfect voice!
 
+## 🎵 Guided Voice Morphing (NEW!)
+
+**The game-changing feature that makes voices sing, match, and transform!**
+
+The Advanced Voice node now supports **guided voice morphing** - using a secondary audio file (like a song or reference voice) to guide the transformation of your TTS output. Perfect for:
+- Making TTS voices "sing" along to music
+- Matching tone and style of reference speakers
+- Creating autotune-style effects
+- Professional voice-over matching
+
+### How to Use Guided Morphing
+
+1. **Connect Guide Audio**:
+   - Load your guide audio (song, reference voice, etc.)
+   - Connect it to the `guide_audio` input on the Advanced Voice node
+
+2. **Enable Morphing**:
+   - Check the `enable_guided_morph` checkbox
+
+3. **Adjust Morph Parameters** (0.0 to 1.0):
+   - **Pitch Morph**: Match pitch contour to guide audio (autotune effect)
+   - **Formant Morph**: Match vocal character and tone
+   - **Spectral Morph**: Match overall timbre and frequency balance
+   - **Amplitude Morph**: Match dynamics and volume envelope
+
+### Morphing Parameters Explained
+
+#### Pitch Morph (0.0 - 1.0)
+- **0.0**: No pitch change (original TTS pitch)
+- **0.3-0.5**: Subtle pitch guidance (natural autotune)
+- **0.7-0.9**: Strong pitch matching (follows melody closely)
+- **1.0**: Complete pitch matching (perfect autotune)
+
+**Use Cases:**
+- Music: 0.7-1.0 to make voice follow melody
+- Speech matching: 0.3-0.5 for natural intonation
+- Character voice: 0.0 (use manual pitch shift instead)
+
+#### Formant Morph (0.0 - 1.0)
+- Matches the vocal tract characteristics
+- Affects perceived age, gender, and character
+- **0.0**: Original voice character
+- **0.5**: Blend of both voices
+- **1.0**: Fully matched character
+
+**Use Cases:**
+- Voice cloning: 0.6-0.9
+- Gender transformation: 0.5-0.7
+- Age adjustment: 0.4-0.6
+
+#### Spectral Morph (0.0 - 1.0)
+- Matches overall frequency spectrum and timbre
+- Affects "brightness", "warmth", and tonal quality
+- Most subtle but powerful for natural matching
+
+**Use Cases:**
+- Microphone matching: 0.5-0.7
+- Tone matching: 0.6-0.8
+- Style transfer: 0.4-0.6
+
+#### Amplitude Morph (0.0 - 1.0)
+- Matches volume dynamics and expression
+- Follows the energy and intensity patterns
+- Great for emotional expression
+
+**Use Cases:**
+- Dynamic speech: 0.5-0.7
+- Singing expression: 0.6-0.8
+- Whisper/shout: 0.4-0.6
+
+### Guided Morphing Examples
+
+#### Example 1: Make TTS Voice Sing
+```
+Setup:
+1. Generate TTS with lyrics text
+2. Load instrumental or vocal track as guide_audio
+3. Enable guided morph
+4. Set: pitch_morph=0.8, formant_morph=0.3, spectral_morph=0.4
+
+Result: Voice follows melody while maintaining TTS character
+```
+
+#### Example 2: Clone Speaking Style
+```
+Setup:
+1. Generate TTS with script
+2. Load reference speaker audio as guide_audio
+3. Enable guided morph
+4. Set: pitch_morph=0.4, formant_morph=0.7, spectral_morph=0.6
+
+Result: TTS matches speaking style and voice character
+```
+
+#### Example 3: Autotune Effect
+```
+Setup:
+1. Generate TTS with any text
+2. Load musical scale or melody as guide_audio
+3. Enable guided morph
+4. Set: pitch_morph=1.0, formant_morph=0.0, spectral_morph=0.2
+
+Result: Perfect pitch-corrected robotic singing effect
+```
+
 ### Advanced Voice Effects
 
-Connect the TTS output to "🔊 Geeky Kokoro Advanced Voice" node for effects:
+Connect the TTS output to "🎛️ Geeky Kokoro Advanced Voice (2025)" node for effects:
 
-#### Preset Profiles:
+#### Preset Profiles (18 Total):
+
+**Original Profiles:**
 - **Cinematic**: Deep, movie-trailer style (-3 semitones, reverb, compression)
 - **Monster**: Growling creature voice (-6 semitones, formant shift, distortion)
 - **Robot**: Mechanical, synthesized voice (band-pass filter, modulation)
@@ -264,14 +376,30 @@ Connect the TTS output to "🔊 Geeky Kokoro Advanced Voice" node for effects:
 - **Darth Vader**: Deep, breathing villain voice (-4 semitones, echo, modulation)
 - **Singer**: Optimized for vocal content (compression, EQ, reverb)
 
-#### Manual Effects:
-- **Pitch Shift**: ±12 semitones
+**NEW Profiles:**
+- **Alien**: Otherworldly voice (-8 semitones, extreme formant shift, modulation)
+- **Deep Voice**: Professional bass voice (-5 semitones, bass boost)
+- **Chipmunk**: High-pitched cartoon voice (+6 semitones, formant shift up)
+- **Telephone**: Classic phone quality (300-3400Hz bandpass, compression)
+- **Radio**: Broadcast radio sound (100-5000Hz, compression, EQ)
+- **Cathedral**: Large reverberant space (heavy reverb, echo)
+- **Cave**: Echo chamber effect (reverb, echo with feedback)
+- **Metallic**: Robotic metallic sound (ring modulation, bandpass)
+- **Whisper**: Quiet breathy voice (noise, reduced bass)
+- **Shout**: Loud emphasized voice (compression, distortion, mid boost)
+- **Custom**: Full manual control of all parameters
+
+#### Manual Controls:
+- **Pitch Shift**: ±12 semitones (0.1 step precision)
 - **Formant Shift**: Vocal tract size adjustment (-5 to +5)
-- **Reverb**: Room ambiance (0.0 to 1.0)
-- **Echo**: Discrete repeats with feedback
+- **Time Stretch**: Speed without pitch change (0.5x to 2.0x)
+- **Reverb**: Room ambiance with room size control
+- **Echo**: Discrete repeats with adjustable feedback
 - **Distortion**: Harmonic saturation (0.0 to 1.0)
 - **Compression**: Dynamic range control
 - **3-Band EQ**: Bass, Mid, Treble (-1.0 to +1.0)
+- **Brightness**: High-frequency emphasis (-1.0 to +1.0)
+- **Warmth**: Low-frequency emphasis (-1.0 to +1.0)
 - **Effect Blend**: Mix with original audio (0.0 to 1.0)
 - **Output Volume**: -60dB to +60dB
 
@@ -293,12 +421,35 @@ Connect the TTS output to "🔊 Geeky Kokoro Advanced Voice" node for effects:
 - Long text (800+ chars): ~15-30 seconds
 - Voice blending: +20% processing time
 - Voice effects: +5-15% processing time
+- Guided morphing: +30-50% processing time (feature extraction + morphing)
 
 **Memory Usage:**
 - Base model: ~2GB VRAM/RAM
 - With GPU acceleration: ~3GB VRAM
 - Voice effects processing: +500MB
 - Voice blending: +200MB temporary
+- Guided morphing: +800MB-1.5GB (feature extraction + DTW alignment)
+
+### Guided Morphing Technology
+
+**Feature Extraction:**
+- **Pitch Tracking**: PYIN algorithm with autocorrelation fallback
+- **Formant Analysis**: LPC (Linear Predictive Coding) with Levinson-Durbin recursion
+- **Spectral Envelope**: Cepstral smoothing with liftering
+- **Amplitude Envelope**: RMS energy tracking
+- **MFCC**: 13-coefficient mel-frequency cepstral analysis
+
+**Morphing Algorithms:**
+- **Dynamic Time Warping (DTW)**: Aligns feature sequences between source and guide
+- **Phase Vocoder**: Time-varying pitch shifting with STFT
+- **Spectral Transfer**: Magnitude envelope morphing with phase preservation
+- **Volume Matching**: RMS-based amplitude envelope transfer
+
+**Supported Guide Audio:**
+- Any sample rate (auto-resampling to 24kHz)
+- Mono or stereo (auto-converted to mono)
+- WAV, MP3, FLAC, OGG formats
+- Recommended: 16kHz+ sample rate for best results
 
 ### Text Processing
 - **Intelligent Chunking**: Automatically splits long texts while preserving sentence order
