@@ -1,9 +1,21 @@
+# Geeky Kokoro TTS Requirements - 2025 Edition
+# Python 3.12 and 3.13 compatible
+# Updated for Kokoro v0.19+ and ComfyUI v3.49+
+
+# Core TTS dependencies
 kokoro>=0.9.4
 soundfile>=0.12.1
-numpy>=1.22.0,<2.0.0
 torch>=2.0.0
 tqdm>=4.64.0
 einops>=0.6.0
+
+# Numeric computing (Python 3.12/3.13 compatible)
+numpy>=1.24.0,<2.0.0
+
+# Audio processing dependencies (for Voice Mod features)
 librosa>=0.10.0
 scipy>=1.9.0,<2.0.0
 resampy>=0.4.3
+
+# Optional but recommended
+# espeak-ng (system package, install via: apt-get install espeak-ng or brew install espeak-ng)
