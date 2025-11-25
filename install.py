@@ -10,6 +10,33 @@ import subprocess
 import os
 from pathlib import Path
 import shutil
+import platform
+
+# Fix Windows console encoding issues
+if platform.system() == 'Windows':
+    try:
+        # Try to set UTF-8 encoding for Windows console
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    except Exception:
+        # If that fails, we'll fall back to ASCII symbols
+        pass
+
+# Detect if we can use Unicode symbols
+def can_use_unicode():
+    """Check if the console supports Unicode characters."""
+    if platform.system() == 'Windows':
+        # Windows console may not support Unicode properly
+        try:
+            # Try to encode Unicode checkmark
+            '✓'.encode(sys.stdout.encoding or 'utf-8')
+            return True
+        except (UnicodeEncodeError, AttributeError):
+            return False
+    return True
+
+USE_UNICODE = can_use_unicode()
 
 
 # Color codes for terminal output
@@ -24,29 +51,40 @@ class Colors:
     BOLD = '\033[1m'
 
 
+# Symbols with fallback for systems that don't support Unicode
+class Symbols:
+    CHECK = '✓' if USE_UNICODE else '+'
+    CROSS = '✗' if USE_UNICODE else 'x'
+    WARNING = '⚠' if USE_UNICODE else '!'
+    BULLET = '•' if USE_UNICODE else '*'
+    ARROW = '==>' if not USE_UNICODE else '==>'
+    PARTY = '🎉' if USE_UNICODE else '***'
+    SPARKLES = '✨' if USE_UNICODE else '***'
+
+
 def print_step(message):
     """Print a main step with formatting."""
-    print(f"\n{Colors.HEADER}{Colors.BOLD}==> {message}{Colors.ENDC}")
+    print(f"\n{Colors.HEADER}{Colors.BOLD}{Symbols.ARROW} {message}{Colors.ENDC}")
 
 
 def print_substep(message):
     """Print a substep with formatting."""
-    print(f"  {Colors.OKCYAN}• {message}{Colors.ENDC}")
+    print(f"  {Colors.OKCYAN}{Symbols.BULLET} {message}{Colors.ENDC}")
 
 
 def print_success(message):
     """Print a success message."""
-    print(f"{Colors.OKGREEN}✓ {message}{Colors.ENDC}")
+    print(f"{Colors.OKGREEN}{Symbols.CHECK} {message}{Colors.ENDC}")
 
 
 def print_warning(message):
     """Print a warning message."""
-    print(f"{Colors.WARNING}⚠ {message}{Colors.ENDC}")
+    print(f"{Colors.WARNING}{Symbols.WARNING} {message}{Colors.ENDC}")
 
 
 def print_error(message):
     """Print an error message."""
-    print(f"{Colors.FAIL}✗ {message}{Colors.ENDC}")
+    print(f"{Colors.FAIL}{Symbols.CROSS} {message}{Colors.ENDC}")
 
 
 def check_python_compatibility():
@@ -283,6 +321,69 @@ def install_audio_dependencies():
     return all_success
 
 
+def install_pyopenjtalk(python_exe):
+    """
+    Try to install pyopenjtalk with multiple strategies.
+
+    Parameters:
+    -----------
+    python_exe : str
+        Path to Python executable
+
+    Returns:
+    --------
+    bool
+        True if installation succeeded, False otherwise
+    """
+    print_substep("Installing pyopenjtalk (Japanese support)...")
+
+    # Strategy 1: Try to install pre-built wheel
+    print_substep("  Attempting to install pre-built wheel...")
+    try:
+        result = subprocess.run(
+            [python_exe, "-m", "pip", "install", "pyopenjtalk>=0.3.0",
+             "--only-binary", ":all:", "--no-warn-script-location"],
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+        if result.returncode == 0:
+            print_success("Installed pyopenjtalk from pre-built wheel")
+            return True
+    except Exception:
+        pass
+
+    # Strategy 2: Try to build from source (requires CMake)
+    print_substep("  Pre-built wheel not available, attempting to build from source...")
+    print_substep("  (This requires CMake to be installed)")
+    try:
+        result = subprocess.run(
+            [python_exe, "-m", "pip", "install", "pyopenjtalk>=0.3.0",
+             "--no-warn-script-location"],
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+        if result.returncode == 0:
+            print_success("Installed pyopenjtalk from source")
+            return True
+        else:
+            # Check if error is CMake-related
+            if "CMake" in result.stderr or "cmake" in result.stderr.lower():
+                print_warning("pyopenjtalk requires CMake to build from source")
+                print_warning("Install CMake from https://cmake.org/download/ to enable Japanese support")
+                print_warning("Or use pre-built wheels if available for your platform")
+            else:
+                print_warning(f"Failed to install pyopenjtalk: {result.stderr[:200]}")
+    except subprocess.TimeoutExpired:
+        print_warning("Timeout while installing pyopenjtalk")
+    except Exception as e:
+        print_warning(f"Error installing pyopenjtalk: {e}")
+
+    print_warning("Japanese voices will not be available without pyopenjtalk")
+    return False
+
+
 def install_language_dependencies():
     """
     Install language-specific dependencies for Japanese and Chinese TTS.
@@ -298,38 +399,37 @@ def install_language_dependencies():
 
     python_exe = find_python_executable()
 
-    language_packages = [
-        "pyopenjtalk>=0.3.0",  # Japanese
-        "ordered-set>=4.1.0",   # Chinese
-    ]
+    # Try to install pyopenjtalk with special handling
+    pyopenjtalk_success = install_pyopenjtalk(python_exe)
 
-    all_success = True
-    for package in language_packages:
-        print_substep(f"Installing {package}...")
-        try:
-            result = subprocess.run(
-                [python_exe, "-m", "pip", "install", package, "--no-warn-script-location"],
-                capture_output=True,
-                text=True,
-                timeout=300
-            )
-            if result.returncode != 0:
-                lang = "Japanese" if "pyopenjtalk" in package else "Chinese"
-                print_warning(f"Failed to install {package} - {lang} voices will not be available")
-                all_success = False
-            else:
-                print_success(f"Installed {package}")
-        except Exception as e:
-            lang = "Japanese" if "pyopenjtalk" in package else "Chinese"
-            print_warning(f"Error installing {package}: {e} - {lang} voices will not be available")
-            all_success = False
+    # Install ordered-set for Chinese support (simpler, no build required)
+    print_substep("Installing ordered-set (Chinese support)...")
+    ordered_set_success = False
+    try:
+        result = subprocess.run(
+            [python_exe, "-m", "pip", "install", "ordered-set>=4.1.0",
+             "--no-warn-script-location"],
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+        if result.returncode == 0:
+            print_success("Installed ordered-set")
+            ordered_set_success = True
+        else:
+            print_warning("Failed to install ordered-set - Chinese voices may not be available")
+    except Exception as e:
+        print_warning(f"Error installing ordered-set: {e}")
 
-    if all_success:
+    if pyopenjtalk_success and ordered_set_success:
         print_success("All language dependencies installed successfully")
+        return True
+    elif pyopenjtalk_success or ordered_set_success:
+        print_warning("Some language dependencies installed - partial language support available")
+        return True
     else:
-        print_warning("Some language dependencies failed - Japanese or Chinese voices may not work")
-
-    return all_success
+        print_warning("Language dependencies failed - using English-only mode")
+        return False
 
 
 def copy_updated_files(source_dir, target_dir):
@@ -407,9 +507,9 @@ def verify_installation(node_dir, comfy_dir):
     for file_name in required_files:
         file_path = node_dir / file_name
         if file_path.exists():
-            print_substep(f"✓ Found {file_name}")
+            print_substep(f"{Symbols.CHECK} Found {file_name}")
         else:
-            print_error(f"✗ Missing {file_name}")
+            print_error(f"{Symbols.CROSS} Missing {file_name}")
             all_present = False
 
     # Check Python imports
@@ -431,9 +531,9 @@ def verify_installation(node_dir, comfy_dir):
             text=True
         )
         if result.returncode == 0:
-            print_substep(f"✓ {module} is importable")
+            print_substep(f"{Symbols.CHECK} {module} is importable")
         else:
-            print_warning(f"✗ {module} import failed - may cause issues")
+            print_warning(f"{Symbols.CROSS} {module} import failed - may cause issues")
             all_present = False
 
     if all_present:
@@ -503,20 +603,20 @@ def main():
         return False
 
     # Final success message and instructions
-    print_success("\n🎉 Geeky Kokoro TTS installation completed!")
+    print_success(f"\n{Symbols.PARTY} Geeky Kokoro TTS installation completed!")
     print_success(f"Node installed at: {node_dir}")
     print_success(f"Models will be cached at: {models_dir}")
     print_success("\nNext steps:")
     print_substep("1. Restart ComfyUI completely")
-    print_substep("2. Look for '🔊 Geeky Kokoro TTS (Updated)' in the node menu")
-    print_substep("3. Look for '🔊 Geeky Kokoro Advanced Voice' for voice effects")
+    print_substep("2. Look for 'Geeky Kokoro TTS (Updated)' in the node menu")
+    print_substep("3. Look for 'Geeky Kokoro Advanced Voice' for voice effects")
     print_substep("4. Models will be downloaded automatically on first use")
     print_substep("5. Check the console for any error messages")
 
     if comfy_parent and comfy_parent.name.lower().startswith("comfyui"):
         print_substep("6. For portable installations, models are cached in your user directory")
 
-    print_success("\n✨ Installation complete! Enjoy using Geeky Kokoro TTS!")
+    print_success(f"\n{Symbols.SPARKLES} Installation complete! Enjoy using Geeky Kokoro TTS!")
 
     return True
 

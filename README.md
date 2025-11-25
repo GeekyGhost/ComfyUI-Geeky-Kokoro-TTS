@@ -94,7 +94,8 @@ REM Install with portable Python
 ```
 
 ### System Dependencies (Optional but Recommended)
-For best phoneme processing, install espeak-ng:
+
+#### espeak-ng (For best phoneme processing)
 
 **Ubuntu/Debian:**
 ```bash
@@ -109,6 +110,29 @@ brew install espeak-ng
 
 **Windows:**
 Download and install from: https://github.com/espeak-ng/espeak-ng/releases
+
+#### CMake (Required for Japanese language support)
+
+Japanese voice support requires `pyopenjtalk`, which needs CMake to build on some platforms:
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install cmake
+```
+
+**macOS:**
+```bash
+brew install cmake
+```
+
+**Windows:**
+1. Download CMake from https://cmake.org/download/
+2. Run the installer and select "Add CMake to system PATH"
+3. Restart your terminal/ComfyUI after installation
+4. Reinstall dependencies: `pip install -r requirements.txt`
+
+**Note:** If you don't need Japanese voices, you can skip CMake installation. The node will work with all other languages without it.
 
 ## 🎭 Complete Voice List (54+ Voices)
 
@@ -514,6 +538,31 @@ pip install -r requirements.txt --force-reinstall
 - Ubuntu/Debian: `sudo apt-get install espeak-ng`
 - macOS: `brew install espeak-ng`
 - Windows: Download from espeak-ng GitHub releases
+
+#### pyopenjtalk / CMake installation error (Windows)
+**Error Message:** "CMake is not found in the system path"
+
+**Solution:**
+1. Install CMake from https://cmake.org/download/
+2. During installation, check "Add CMake to system PATH"
+3. Restart your terminal/command prompt
+4. Reinstall dependencies:
+   ```batch
+   python -m pip install -r requirements.txt
+   ```
+
+**Alternative (Skip Japanese support):**
+- The installation script will continue even if pyopenjtalk fails
+- All other languages will work normally
+- Only Japanese voices require pyopenjtalk
+
+#### Unicode encoding errors (Windows Console)
+**Error Message:** "UnicodeEncodeError: 'charmap' codec can't encode character"
+
+**Solution:**
+- This has been fixed in the latest version
+- Update to the latest version: `git pull origin main`
+- The installer now automatically handles Windows console encoding
 
 ### Performance Tips
 1. **For long texts**: Enable GPU acceleration

@@ -17,8 +17,11 @@ librosa>=0.10.0
 scipy>=1.9.0,<2.0.0
 resampy>=0.4.3
 
-# Language-specific dependencies
-pyopenjtalk>=0.3.0  # For Japanese language support
+# Language-specific dependencies (optional)
+# Note: pyopenjtalk requires CMake for building from source on some platforms
+# Install CMake from https://cmake.org/download/ if needed
+# Or use pre-built wheels if available for your platform
+pyopenjtalk>=0.3.0  # For Japanese language support (optional, requires CMake)
 ordered-set>=4.1.0  # For Chinese language support
 
 # Optional but recommended
