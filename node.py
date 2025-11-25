@@ -145,44 +145,44 @@ class GeekyKokoroTTSNode:
             '🇬🇧 🚹 Daniel': 'bm_daniel',
 
             # Japanese Voices (5 voices: 4F + 1M)
-            '🇯🇵 🚺 Hina ひな': 'jf_hina',
-            '🇯🇵 🚺 Yuki 雪': 'jf_yuki',
-            '🇯🇵 🚺 Sakura 桜': 'jf_sakura',
-            '🇯🇵 🚺 Sora 空': 'jf_sora',
-            '🇯🇵 🚹 Kaito 海斗': 'jm_kaito',
+            '🇯🇵 🚺 Alpha α': 'jf_alpha',
+            '🇯🇵 🚺 Gongitsune 権狐': 'jf_gongitsune',
+            '🇯🇵 🚺 Nezumi 鼠': 'jf_nezumi',
+            '🇯🇵 🚺 Tebukuro 手袋': 'jf_tebukuro',
+            '🇯🇵 🚹 Kumo 蜘蛛': 'jm_kumo',
 
             # Mandarin Chinese Voices (8 voices: 4F + 4M)
+            '🇨🇳 🚺 Xiaobei 小贝': 'zf_xiaobei',
+            '🇨🇳 🚺 Xiaoni 小妮': 'zf_xiaoni',
             '🇨🇳 🚺 Xiaoxiao 小小': 'zf_xiaoxiao',
-            '🇨🇳 🚺 Yunxi 云希': 'zf_yunxi',
             '🇨🇳 🚺 Xiaoyi 小艺': 'zf_xiaoyi',
-            '🇨🇳 🚺 Xiaoxuan 小萱': 'zf_xiaoxuan',
-            '🇨🇳 🚹 Yunyang 云扬': 'zm_yunyang',
-            '🇨🇳 🚹 Yunfeng 云枫': 'zm_yunfeng',
-            '🇨🇳 🚹 Yunhao 云昊': 'zm_yunhao',
+            '🇨🇳 🚹 Yunjian 云健': 'zm_yunjian',
+            '🇨🇳 🚹 Yunxi 云希': 'zm_yunxi',
             '🇨🇳 🚹 Yunxia 云霞': 'zm_yunxia',
+            '🇨🇳 🚹 Yunyang 云扬': 'zm_yunyang',
 
             # Spanish Voices (3 voices: 1F + 2M)
-            '🇪🇸 🚺 Sofia': 'ef_sofia',
-            '🇪🇸 🚹 Diego': 'em_diego',
-            '🇪🇸 🚹 Carlos': 'em_carlos',
+            '🇪🇸 🚺 Dora': 'ef_dora',
+            '🇪🇸 🚹 Alex': 'em_alex',
+            '🇪🇸 🚹 Santa 🎅': 'em_santa',
 
             # French Voices (1 voice: 1F)
-            '🇫🇷 🚺 Céline': 'ff_celine',
+            '🇫🇷 🚺 Siwis': 'ff_siwis',
 
             # Hindi Voices (4 voices: 2F + 2M)
-            '🇮🇳 🚺 Priya': 'hf_priya',
-            '🇮🇳 🚺 Anjali': 'hf_anjali',
-            '🇮🇳 🚹 Arjun': 'hm_arjun',
-            '🇮🇳 🚹 Raj': 'hm_raj',
+            '🇮🇳 🚺 Alpha α': 'hf_alpha',
+            '🇮🇳 🚺 Beta β': 'hf_beta',
+            '🇮🇳 🚹 Omega Ω': 'hm_omega',
+            '🇮🇳 🚹 Psi Ψ': 'hm_psi',
 
             # Italian Voices (2 voices: 1F + 1M)
-            '🇮🇹 🚺 Giulia': 'if_giulia',
-            '🇮🇹 🚹 Marco': 'im_marco',
+            '🇮🇹 🚺 Sara': 'if_sara',
+            '🇮🇹 🚹 Nicola': 'im_nicola',
 
             # Brazilian Portuguese Voices (3 voices: 1F + 2M)
-            '🇧🇷 🚺 Lúcia': 'pf_lucia',
-            '🇧🇷 🚹 João': 'pm_joao',
-            '🇧🇷 🚹 Pedro': 'pm_pedro',
+            '🇧🇷 🚺 Dora': 'pf_dora',
+            '🇧🇷 🚹 Alex': 'pm_alex',
+            '🇧🇷 🚹 Santa 🎅': 'pm_santa',
         }
 
         if not KOKORO_AVAILABLE:
