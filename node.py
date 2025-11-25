@@ -51,13 +51,13 @@ class GeekyKokoroTTSNode:
                     "multiline": True, 
                     "default": "Welcome to the updated Geeky Kokoro TTS for ComfyUI. This version features improved text chunking and the latest Kokoro models."
                 }),
-                "voice": (list(cls.VOICES.keys()), {"default": "🇺🇸 🚺 Heart ❤️"}),
+                "voice": (list(cls.VOICES.keys()), {"default": "🇺🇸 🚺 Default (Bella+Sarah)"}),
                 "speed": ("FLOAT", {"default": 1.0, "min": 0.5, "max": 2.0, "step": 0.1}),
                 "use_gpu": ("BOOLEAN", {"default": torch.cuda.is_available()}),
             },
             "optional": {
                 "enable_blending": ("BOOLEAN", {"default": False}),
-                "second_voice": (list(cls.VOICES.keys()) if cls.VOICES else ["🇺🇸 🚺 Sarah"], {"default": "🇺🇸 🚺 Sarah"}),
+                "second_voice": (list(cls.VOICES.keys()) if cls.VOICES else ["🇺🇸 🚺 Default (Bella+Sarah)"], {"default": "🇺🇸 🚺 Sarah"}),
                 "blend_ratio": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.1, "display": "slider"}),
             }
         }
@@ -104,24 +104,43 @@ class GeekyKokoroTTSNode:
             
         logger.info("Initializing Geeky Kokoro TTS with updated models...")
         
-        # Updated voice list for Kokoro v0.19+
+        # Updated voice list for Kokoro v0.19+ (Kokoro-82M)
+        # Based on official hexgrad/Kokoro-82M voice list
         cls.VOICES = {
-            # US English Voices
-            '🇺🇸 🚺 Heart ❤️': 'af_heart', '🇺🇸 🚺 Bella 🔥': 'af_bella',
-            '🇺🇸 🚺 Nicole 🎧': 'af_nicole', '🇺🇸 🚺 Aoede': 'af_aoede',
-            '🇺🇸 🚺 Kore': 'af_kore', '🇺🇸 🚺 Sarah': 'af_sarah',
-            '🇺🇸 🚺 Nova': 'af_nova', '🇺🇸 🚺 Sky': 'af_sky',
-            '🇺🇸 🚺 Alloy': 'af_alloy', '🇺🇸 🚺 Jessica': 'af_jessica',
-            '🇺🇸 🚺 River': 'af_river', '🇺🇸 🚹 Michael': 'am_michael',
-            '🇺🇸 🚹 Fenrir': 'am_fenrir', '🇺🇸 🚹 Puck': 'am_puck',
-            '🇺🇸 🚹 Echo': 'am_echo', '🇺🇸 🚹 Eric': 'am_eric',
-            '🇺🇸 🚹 Liam': 'am_liam', '🇺🇸 🚹 Onyx': 'am_onyx',
+            # US English Female Voices (American English)
+            '🇺🇸 🚺 Default (Bella+Sarah)': 'af',  # Default 50-50 mix
+            '🇺🇸 🚺 Heart ❤️': 'af_heart',
+            '🇺🇸 🚺 Bella 🔥': 'af_bella',
+            '🇺🇸 🚺 Nicole 🎧': 'af_nicole',
+            '🇺🇸 🚺 Sarah': 'af_sarah',
+            '🇺🇸 🚺 Sky': 'af_sky',
+            '🇺🇸 🚺 Nova': 'af_nova',
+            '🇺🇸 🚺 Alloy': 'af_alloy',
+            '🇺🇸 🚺 Aoede': 'af_aoede',
+            '🇺🇸 🚺 Jessica': 'af_jessica',
+            '🇺🇸 🚺 Kore': 'af_kore',
+            '🇺🇸 🚺 River': 'af_river',
+            '🇺🇸 🚺 Sam': 'af_sam',
+            # US English Male Voices (American English)
             '🇺🇸 🚹 Adam': 'am_adam',
-            # UK English Voices  
-            '🇬🇧 🚺 Emma': 'bf_emma', '🇬🇧 🚺 Isabella': 'bf_isabella',
-            '🇬🇧 🚺 Alice': 'bf_alice', '🇬🇧 🚺 Lily': 'bf_lily',
-            '🇬🇧 🚹 George': 'bm_george', '🇬🇧 🚹 Fable': 'bm_fable',
-            '🇬🇧 🚹 Lewis': 'bm_lewis', '🇬🇧 🚹 Daniel': 'bm_daniel',
+            '🇺🇸 🚹 Michael': 'am_michael',
+            '🇺🇸 🚹 Echo': 'am_echo',
+            '🇺🇸 🚹 Eric': 'am_eric',
+            '🇺🇸 🚹 Fenrir': 'am_fenrir',
+            '🇺🇸 🚹 Liam': 'am_liam',
+            '🇺🇸 🚹 Onyx': 'am_onyx',
+            '🇺🇸 🚹 Puck': 'am_puck',
+            '🇺🇸 🚹 Sam': 'am_sam',
+            # UK English Female Voices (British English)
+            '🇬🇧 🚺 Emma': 'bf_emma',
+            '🇬🇧 🚺 Isabella': 'bf_isabella',
+            '🇬🇧 🚺 Alice': 'bf_alice',
+            '🇬🇧 🚺 Lily': 'bf_lily',
+            # UK English Male Voices (British English)
+            '🇬🇧 🚹 George': 'bm_george',
+            '🇬🇧 🚹 Lewis': 'bm_lewis',
+            '🇬🇧 🚹 Daniel': 'bm_daniel',
+            '🇬🇧 🚹 Fable': 'bm_fable',
         }
         
         if not KOKORO_AVAILABLE:
@@ -355,7 +374,8 @@ class GeekyKokoroTTSNode:
                     # Load GPU model if requested and not already loaded
                     if use_gpu and True not in self.MODEL and torch.cuda.is_available():
                         try:
-                            self.MODEL[True] = KModel().to('cuda').eval()
+                            with self._suppress_warnings():
+                                self.MODEL[True] = KModel(repo_id='hexgrad/Kokoro-82M').to('cuda').eval()
                         except Exception as gpu_e:
                             logger.warning(f"Failed to load GPU model: {gpu_e}. Using CPU.")
                             use_gpu = False

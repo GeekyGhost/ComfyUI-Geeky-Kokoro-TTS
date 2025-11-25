@@ -23,7 +23,7 @@ A powerful and feature-rich custom node collection for ComfyUI that integrates t
 
 ### Geeky Kokoro TTS Node
 - **Latest Kokoro Models**: Uses Kokoro v0.19 (82M parameters) with Apache 2.0 license
-- **27+ Premium Voices**: High-quality English (US/UK) voices with distinct characteristics
+- **30 Premium Voices**: High-quality English voices (13 US Female, 9 US Male, 4 UK Female, 4 UK Male)
 - **Voice Blending**: Combine two voices with adjustable blend ratios for unique styles
 - **Intelligent Text Processing**: Advanced chunking that preserves text structure and order
 - **Speed Control**: Adjust speech rate from 0.5x to 2.0x with natural pitch preservation
@@ -142,26 +142,59 @@ Output: [skips Line 1] "Line 2. Line 3. Line 1 Line 4."
 3. Adjust effect parameters to taste
 4. Use "effect_blend" to mix with original audio
 
-## 🎭 Available Voices (Updated)
+## 🎭 Available Voices (Complete List)
 
-### 🇺🇸 US English Voices
-| Voice | Character | Best For |
-|-------|-----------|----------|
-| Heart ❤️ | Warm, friendly female | Narration, audiobooks |
-| Bella 🔥 | Energetic, dynamic female | Marketing, announcements |
-| Nicole 🎧 | Clear, professional female | Training, instructional |
-| Michael | Deep, authoritative male | Documentary, serious content |
-| Puck | Playful, character male | Gaming, entertainment |
-| Sarah | Neutral, versatile female | General purpose |
-| *...and 13 more voices* | | |
+### 🇺🇸 US English Voices (13 Female, 9 Male)
 
-### 🇬🇧 UK English Voices  
-| Voice | Character | Best For |
-|-------|-----------|----------|
-| Emma | Refined, elegant female | Formal content, literature |
-| George | Professional, authoritative male | Business, education |
-| Alice | Clear, storytelling female | Children's content |
-| *...and 5 more voices* | | |
+#### Female Voices
+| Voice | Code | Character | Best For |
+|-------|------|-----------|----------|
+| Default (Bella+Sarah) | af | Balanced, natural blend | All-purpose, default choice |
+| Heart ❤️ | af_heart | Warm, friendly | Narration, audiobooks |
+| Bella 🔥 | af_bella | Energetic, dynamic | Marketing, announcements |
+| Nicole 🎧 | af_nicole | Clear, professional | Training, instructional |
+| Sarah | af_sarah | Neutral, versatile | General purpose |
+| Sky | af_sky | Bright, upbeat | Casual, conversational |
+| Nova | af_nova | Modern, crisp | Tech, innovation |
+| Alloy | af_alloy | Smooth, polished | Corporate, professional |
+| Aoede | af_aoede | Expressive, artistic | Creative content |
+| Jessica | af_jessica | Friendly, approachable | Customer service |
+| Kore | af_kore | Calm, soothing | Meditation, wellness |
+| River | af_river | Natural, flowing | Storytelling |
+| Sam | af_sam | Versatile, adaptive | Multi-purpose |
+
+#### Male Voices
+| Voice | Code | Character | Best For |
+|-------|------|-----------|----------|
+| Adam | am_adam | Deep, authoritative | Business, leadership |
+| Michael | am_michael | Professional, clear | Documentary, serious content |
+| Echo | am_echo | Resonant, impactful | Announcements, drama |
+| Eric | am_eric | Friendly, casual | Conversational content |
+| Fenrir | am_fenrir | Strong, powerful | Action, intensity |
+| Liam | am_liam | Warm, trustworthy | Narration, guidance |
+| Onyx | am_onyx | Smooth, sophisticated | Luxury, premium |
+| Puck | am_puck | Playful, character | Gaming, entertainment |
+| Sam | am_sam | Versatile, neutral | Multi-purpose |
+
+### 🇬🇧 UK English Voices (4 Female, 4 Male)
+
+#### Female Voices
+| Voice | Code | Character | Best For |
+|-------|------|-----------|----------|
+| Emma | bf_emma | Refined, elegant | Formal content, literature |
+| Isabella | bf_isabella | Professional, polished | Business, presentations |
+| Alice | bf_alice | Clear, storytelling | Children's content, education |
+| Lily | bf_lily | Gentle, pleasant | Narration, audiobooks |
+
+#### Male Voices
+| Voice | Code | Character | Best For |
+|-------|------|-----------|----------|
+| George | bm_george | Professional, authoritative | Business, education |
+| Lewis | bm_lewis | Clear, trustworthy | News, information |
+| Daniel | bm_daniel | Friendly, engaging | Conversational, tutorials |
+| Fable | bm_fable | Expressive, character | Storytelling, creative |
+
+**Total: 30 unique voices** (13 US Female + 9 US Male + 4 UK Female + 4 UK Male)
 
 ## ⚙️ Voice Effect Presets
 
@@ -267,6 +300,9 @@ The node automatically handles model placement following ComfyUI conventions. Mo
 - ✅ **Python 3.13 Support**: Added full compatibility with Python 3.13
 - ✅ **Enhanced Portable Support**: Improved installation for ComfyUI portable with Python 3.13
 - ✅ **Complete Install Script**: Comprehensive installation with all helper functions
+- ✅ **30 Voices**: Added complete voice list including default 'af' voice, Sam voices, and organized all 30 English voices
+- ✅ **Warning Fixes**: Fixed repo_id warning by passing parameter to GPU model initialization
+- ✅ **Improved Warning Suppression**: Added warning suppression for GPU model loading
 - ✅ Updated documentation for Python 3.9-3.13 compatibility
 
 ### v2.0.0
