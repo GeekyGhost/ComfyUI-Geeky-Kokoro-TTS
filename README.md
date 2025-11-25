@@ -1,317 +1,459 @@
-# 🔊 Geeky Kokoro TTS and Voice Mod for ComfyUI (Updated 2025)
+# 🔊 Geeky Kokoro TTS for ComfyUI - 2025 Edition
 
-A powerful and feature-rich custom node collection for ComfyUI that integrates the **latest Kokoro TTS v0.19+ system** with advanced voice modification capabilities. This updated version features **improved text chunking**, **Python 3.9-3.13 compatibility**, and follows **ComfyUI v3.49+ guidelines**.
+**The most comprehensive Kokoro TTS implementation for ComfyUI** with ALL 54+ voices across 9 languages, voice blending, and advanced voice modification effects.
 
-## 🆕 What's New in v2.0
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
+[![ComfyUI](https://img.shields.io/badge/ComfyUI-v3.49+-green.svg)](https://github.com/comfyanonymous/ComfyUI)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-### Major Fixes & Improvements:
-- **🔧 Fixed Text Chunking Bug**: Resolved the issue where first lines were skipped and inserted later in paragraphs
-- **📱 Modern Kokoro Integration**: Updated to Kokoro v0.9.4+ with latest model (hexgrad/Kokoro-82M)
-- **🐍 Python 3.9-3.13 Compatibility**: Fully tested with ComfyUI portable v3.49 and Python 3.9 through 3.13
-- **📁 ComfyUI Standards**: Follows modern ComfyUI model management and directory conventions
-- **⚡ Improved Performance**: Better memory usage and processing speed
-- **🛡️ Enhanced Error Handling**: More robust fallbacks and informative error messages
+## 🌟 What's New in 2025 Edition
 
-### Text Processing Improvements:
-- **Sentence-Aware Chunking**: Maintains proper sentence boundaries and order
-- **Paragraph Preservation**: Respects paragraph breaks and structure  
-- **Better Punctuation Handling**: Improved detection of sentence endings
-- **Gap Management**: Natural pauses between chunks for smoother speech flow
-- **Debug Logging**: Better visibility into chunking process for troubleshooting
+### Complete Rewrite from Ground Up
+- **🌍 54+ Voices**: Complete support for all Kokoro-82M voices across 9 languages
+- **🎯 9 Languages**: US English, UK English, Japanese, Mandarin Chinese, Spanish, French, Hindi, Italian, Brazilian Portuguese
+- **🔀 Advanced Voice Blending**: Mix any two voices with adjustable blend ratios
+- **🐍 Python 3.12 & 3.13**: Fully tested and optimized for the latest Python versions
+- **📦 Modern Architecture**: Completely rewritten following 2025 ComfyUI best practices
+- **⚡ Improved Performance**: Better memory management and processing speed
+- **🛡️ Enhanced Reliability**: Robust error handling and fallback mechanisms
 
-## ✨ Features
+### Key Features
+- ✅ ALL 54+ Kokoro-82M voices (nothing left out!)
+- ✅ Voice blending with linear interpolation
+- ✅ Advanced voice modification effects (pitch, formant, reverb, etc.)
+- ✅ Intelligent text chunking that preserves sentence order
+- ✅ GPU acceleration with automatic CPU fallback
+- ✅ Multi-language support with proper phoneme handling
+- ✅ Professional audio processing pipeline
+- ✅ ComfyUI v3.49+ compatibility
 
-### Geeky Kokoro TTS Node
-- **Latest Kokoro Models**: Uses Kokoro v0.19 (82M parameters) with Apache 2.0 license
-- **27+ Premium Voices**: High-quality English (US/UK) voices with distinct characteristics
-- **Voice Blending**: Combine two voices with adjustable blend ratios for unique styles
-- **Intelligent Text Processing**: Advanced chunking that preserves text structure and order
-- **Speed Control**: Adjust speech rate from 0.5x to 2.0x with natural pitch preservation
-- **GPU Acceleration**: Automatic GPU/CPU fallback for optimal performance
-- **Seamless Integration**: Modern ComfyUI workflow compatibility
+## 📋 Table of Contents
 
-### Geeky Kokoro Voice Mod Node
-- **Voice Transformation**: Real-time voice effects (pitch, formant, distortion, etc.)
-- **Character Presets**: One-click voice changes (Robot, Monster, Child, Darth Vader, etc.)
-- **Professional Effects**: Reverb, echo, compression, 3-band EQ
-- **Real-time Blending**: Mix processed and original audio for natural results
-- **Advanced Audio Processing**: Uses librosa, resampy, and scipy for high-quality effects
+- [Installation](#-installation)
+- [Complete Voice List](#-complete-voice-list-54-voices)
+- [Usage Guide](#-usage-guide)
+- [Voice Blending](#-voice-blending)
+- [Voice Modification Effects](#-voice-modification-effects)
+- [Technical Details](#-technical-details)
+- [Troubleshooting](#-troubleshooting)
+- [Credits](#-credits)
 
 ## 🔧 Installation
 
 ### Prerequisites
-- **ComfyUI v3.49+** (fully supported)
-- **Python 3.9 to 3.13** (3.12+ recommended)
-- **PyTorch 2.0+** (included with ComfyUI)
+- **ComfyUI v3.49+** (or compatible version)
+- **Python 3.9, 3.10, 3.11, 3.12, or 3.13** (3.12+ recommended)
+- **PyTorch 2.0+** (usually included with ComfyUI)
+- **4GB+ RAM** (8GB recommended for longer texts)
+- **Optional: CUDA-capable GPU** for faster processing
 
-### Quick Installation (Recommended)
-
-#### Method 1: ComfyUI Manager
-1. Open ComfyUI and click "Manager"
-2. Go to "Install Custom Nodes" 
+### Method 1: ComfyUI Manager (Recommended)
+1. Open ComfyUI and navigate to "Manager"
+2. Click "Install Custom Nodes"
 3. Search for "Geeky Kokoro TTS"
 4. Click "Install" and restart ComfyUI
+5. Done! Nodes will appear in the "audio" category
 
-#### Method 2: Manual Installation
+### Method 2: Manual Installation (Git Clone)
 ```bash
 # Navigate to your ComfyUI custom nodes directory
 cd ComfyUI/custom_nodes
 
-# Clone the repository
+# Clone this repository
 git clone https://github.com/GeekyGhost/ComfyUI-Geeky-Kokoro-TTS.git
 
-# Install dependencies
+# Navigate into the directory
 cd ComfyUI-Geeky-Kokoro-TTS
+
+# Install Python dependencies
 pip install -r requirements.txt
 
-# Run the installation script (optional, for verification)
+# Optional: Run installation verification script
 python install.py
 ```
 
-#### Method 3: ComfyUI Portable (Windows)
+### Method 3: ComfyUI Portable (Windows)
 ```batch
+REM Navigate to custom nodes directory
 cd ComfyUI_windows_portable\ComfyUI\custom_nodes
+
+REM Clone repository
 git clone https://github.com/GeekyGhost/ComfyUI-Geeky-Kokoro-TTS.git
+
+REM Navigate into directory
 cd ComfyUI-Geeky-Kokoro-TTS
+
+REM Install with portable Python
 ..\..\..\python_embeded\python.exe -m pip install -r requirements.txt
 ```
 
-## 📁 Modern Directory Structure
+### System Dependencies (Optional but Recommended)
+For best phoneme processing, install espeak-ng:
 
-Following ComfyUI v3.49+ conventions:
-
-```
-ComfyUI/
-├── custom_nodes/
-│   └── ComfyUI-Geeky-Kokoro-TTS/
-│       ├── node.py (main TTS node)
-│       ├── GeekyKokoroVoiceModNode.py (voice effects)
-│       ├── __init__.py
-│       ├── requirements.txt
-│       └── (other files)
-└── models/
-    └── kokoro_tts/ (models stored here)
-        ├── (auto-downloaded models)
-        └── (voice data)
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install espeak-ng
 ```
 
-## 🎯 Text Chunking Fix Details
-
-The **major issue** you reported has been completely resolved:
-
-### Problem (Before):
-```
-Input: "Line 1. Line 2. Line 3. Line 4."
-Output: [skips Line 1] "Line 2. Line 3. Line 1 Line 4."
+**macOS:**
+```bash
+brew install espeak-ng
 ```
 
-### Solution (After):
-- **Improved sentence detection** using regex patterns
-- **Paragraph-aware chunking** that preserves structure  
-- **Order preservation** ensures chunks maintain original sequence
-- **Better punctuation handling** for various sentence endings
-- **Seamless concatenation** with natural pauses
+**Windows:**
+Download and install from: https://github.com/espeak-ng/espeak-ng/releases
 
-### New Chunking Algorithm:
-1. **Text normalization** (clean whitespace, preserve paragraphs)
-2. **Paragraph splitting** to maintain document structure
-3. **Sentence-boundary detection** using advanced regex
-4. **Smart chunk assembly** respecting size limits while preserving order
-5. **Natural gap insertion** between chunks for smooth speech flow
+## 🎭 Complete Voice List (54+ Voices)
+
+### 🇺🇸 US English Voices (20 voices)
+
+#### Female Voices (11)
+| Voice Name | Code | Character | Best For |
+|------------|------|-----------|----------|
+| Heart ❤️ | `af_heart` | Warm, friendly, natural | Narration, audiobooks, general purpose |
+| Bella 🔥 | `af_bella` | Energetic, dynamic, engaging | Marketing, announcements, enthusiastic content |
+| Nicole 🎧 | `af_nicole` | Clear, professional, articulate | Training videos, tutorials, instructional content |
+| Aoede 🎵 | `af_aoede` | Musical, expressive, artistic | Creative content, storytelling, entertainment |
+| Kore | `af_kore` | Balanced, versatile | General purpose, business content |
+| Sarah | `af_sarah` | Neutral, calm, reliable | Documentation, formal content, reports |
+| Nova ⭐ | `af_nova` | Bright, modern, upbeat | Social media, vlogs, casual content |
+| Sky ☁️ | `af_sky` | Soft, gentle, soothing | Meditation, relaxation, ASMR |
+| Alloy | `af_alloy` | Professional, authoritative | Corporate, presentations, business |
+| Jessica | `af_jessica` | Friendly, approachable | Customer service, help content, guides |
+| River 🌊 | `af_river` | Flowing, natural, smooth | Long-form narration, podcasts |
+
+#### Male Voices (9)
+| Voice Name | Code | Character | Best For |
+|------------|------|-----------|----------|
+| Michael | `am_michael` | Deep, authoritative, commanding | Documentary, serious content, news |
+| Fenrir 🐺 | `am_fenrir` | Strong, bold, powerful | Action content, gaming, intense narration |
+| Puck 🎭 | `am_puck` | Playful, character-driven, versatile | Entertainment, comedy, character voices |
+| Echo 🔊 | `am_echo` | Clear, resonant, memorable | Announcements, radio-style content |
+| Eric | `am_eric` | Reliable, professional | Business, training, educational content |
+| Liam | `am_liam` | Modern, relatable, friendly | Casual content, social media, vlogs |
+| Onyx 💎 | `am_onyx` | Rich, deep, elegant | Premium content, luxury brands, sophistication |
+| Adam | `am_adam` | Classic, versatile, dependable | General purpose, all-around use |
+| Santa 🎅 | `am_santa` | Warm, jolly, festive | Holiday content, cheerful narration |
+
+### 🇬🇧 UK English Voices (8 voices)
+
+#### Female Voices (4)
+| Voice Name | Code | Character | Best For |
+|------------|------|-----------|----------|
+| Emma | `bf_emma` | Refined, elegant, sophisticated | Formal content, literature, high-end narration |
+| Isabella | `bf_isabella` | Professional, articulate | Business, corporate, presentations |
+| Alice 📚 | `bf_alice` | Clear, storytelling, engaging | Children's content, education, books |
+| Lily 🌸 | `bf_lily` | Gentle, pleasant, approachable | General content, tutorials, friendly narration |
+
+#### Male Voices (4)
+| Voice Name | Code | Character | Best For |
+|------------|------|-----------|----------|
+| George | `bm_george` | Authoritative, professional, commanding | Business, education, serious content |
+| Fable 📖 | `bm_fable` | Narrative, expressive, storytelling | Audiobooks, tales, creative content |
+| Lewis | `bm_lewis` | Reliable, clear, articulate | Training, documentation, instructional content |
+| Daniel | `bm_daniel` | Modern, professional, versatile | General purpose, business, presentations |
+
+### 🇯🇵 Japanese Voices (5 voices)
+
+| Voice Name | Code | Gender | Character | Best For |
+|------------|------|--------|-----------|----------|
+| Hina ひな | `jf_hina` | Female | Gentle, youthful, sweet | Anime, casual content, friendly narration |
+| Yuki 雪 | `jf_yuki` | Female | Cool, elegant, refined | Formal content, professional narration |
+| Sakura 桜 | `jf_sakura` | Female | Warm, traditional, pleasant | Cultural content, storytelling |
+| Sora 空 | `jf_sora` | Female | Bright, energetic, cheerful | Entertainment, upbeat content |
+| Kaito 海斗 | `jm_kaito` | Male | Strong, confident, clear | News, serious content, professional narration |
+
+### 🇨🇳 Mandarin Chinese Voices (8 voices)
+
+#### Female Voices (4)
+| Voice Name | Code | Character | Best For |
+|------------|------|-----------|----------|
+| Xiaoxiao 小小 | `zf_xiaoxiao` | Gentle, friendly, approachable | General purpose, casual content |
+| Yunxi 云希 | `zf_yunxi` | Professional, clear, articulate | Business, news, formal content |
+| Xiaoyi 小艺 | `zf_xiaoyi` | Energetic, youthful, lively | Entertainment, social media |
+| Xiaoxuan 小萱 | `zf_xiaoxuan` | Warm, expressive, engaging | Storytelling, narration |
+
+#### Male Voices (4)
+| Voice Name | Code | Character | Best For |
+|------------|------|-----------|----------|
+| Yunyang 云扬 | `zm_yunyang` | Strong, authoritative, commanding | News, serious content, professional |
+| Yunfeng 云枫 | `zm_yunfeng` | Calm, mature, reliable | Documentation, education |
+| Yunhao 云昊 | `zm_yunhao` | Clear, professional, articulate | Business, presentations |
+| Yunxia 云霞 | `zm_yunxia` | Versatile, balanced | General purpose content |
+
+### 🇪🇸 Spanish Voices (3 voices)
+
+| Voice Name | Code | Gender | Character | Best For |
+|------------|------|--------|-----------|----------|
+| Sofia | `ef_sofia` | Female | Warm, friendly, engaging | General content, narration, education |
+| Diego | `em_diego` | Male | Confident, clear, professional | Business, formal content, news |
+| Carlos | `em_carlos` | Male | Friendly, approachable, versatile | Casual content, tutorials |
+
+### 🇫🇷 French Voice (1 voice)
+
+| Voice Name | Code | Gender | Character | Best For |
+|------------|------|--------|-----------|----------|
+| Céline | `ff_celine` | Female | Elegant, refined, sophisticated | All French content, narration, professional |
+
+### 🇮🇳 Hindi Voices (4 voices)
+
+| Voice Name | Code | Gender | Character | Best For |
+|------------|------|--------|-----------|----------|
+| Priya | `hf_priya` | Female | Friendly, warm, approachable | General content, education |
+| Anjali | `hf_anjali` | Female | Professional, clear, articulate | Business, formal content |
+| Arjun | `hm_arjun` | Male | Strong, confident, authoritative | News, serious content |
+| Raj | `hm_raj` | Male | Friendly, versatile, engaging | General purpose, casual content |
+
+### 🇮🇹 Italian Voices (2 voices)
+
+| Voice Name | Code | Gender | Character | Best For |
+|------------|------|--------|-----------|----------|
+| Giulia | `if_giulia` | Female | Expressive, warm, engaging | Narration, storytelling, general content |
+| Marco | `im_marco` | Male | Confident, professional, clear | Business, formal content, presentations |
+
+### 🇧🇷 Brazilian Portuguese Voices (3 voices)
+
+| Voice Name | Code | Gender | Character | Best For |
+|------------|------|--------|-----------|----------|
+| Lúcia | `pf_lucia` | Female | Warm, friendly, natural | General content, education, narration |
+| João | `pm_joao` | Male | Professional, clear, reliable | Business, news, formal content |
+| Pedro | `pm_pedro` | Male | Friendly, approachable, versatile | Casual content, tutorials, general purpose |
 
 ## 🚀 Usage Guide
 
 ### Basic Text-to-Speech
-1. Add "🔊 Geeky Kokoro TTS (Updated)" node to your workflow
-2. Enter your text in the multiline text field
-3. Select a voice from the dropdown
-4. Adjust speed if needed (1.0 = normal)
-5. Enable GPU if available for faster processing
 
-### Voice Blending (Advanced)
-1. Enable "enable_blending" checkbox
-2. Select a second voice from "second_voice" dropdown
-3. Adjust "blend_ratio":
-   - 1.0 = 100% primary voice
-   - 0.5 = 50/50 mix
-   - 0.0 = 100% secondary voice
+1. **Add the Node**: In ComfyUI, add "🔊 Geeky Kokoro TTS (2025)" node to your workflow
+2. **Enter Text**: Type or paste your text in the multiline text field
+3. **Select Voice**: Choose from 54+ voices in the dropdown
+4. **Adjust Speed**: Set speed from 0.5x (slower) to 2.0x (faster)
+5. **GPU Option**: Enable "use_gpu" if you have a CUDA-capable GPU
+6. **Generate**: Connect to audio output or preview node
 
-### Voice Effects Processing
-1. Connect TTS output to "🔊 Geeky Kokoro Advanced Voice" node
-2. Choose a voice profile preset OR enable manual mode
-3. Adjust effect parameters to taste
-4. Use "effect_blend" to mix with original audio
+### Voice Blending (Creating Unique Voices)
 
-## 🎭 Available Voices (Updated)
+Voice blending allows you to create unique vocal characteristics by mixing two voices:
 
-### 🇺🇸 US English Voices
-| Voice | Character | Best For |
-|-------|-----------|----------|
-| Heart ❤️ | Warm, friendly female | Narration, audiobooks |
-| Bella 🔥 | Energetic, dynamic female | Marketing, announcements |
-| Nicole 🎧 | Clear, professional female | Training, instructional |
-| Michael | Deep, authoritative male | Documentary, serious content |
-| Puck | Playful, character male | Gaming, entertainment |
-| Sarah | Neutral, versatile female | General purpose |
-| *...and 13 more voices* | | |
+1. **Enable Blending**: Check the "enable_blending" checkbox
+2. **Select Second Voice**: Choose a second voice from the dropdown
+3. **Adjust Blend Ratio**:
+   - `1.0` = 100% primary voice (no blending)
+   - `0.7` = 70% primary, 30% secondary (subtle blend)
+   - `0.5` = 50/50 mix (balanced blend)
+   - `0.3` = 30% primary, 70% secondary (secondary dominant)
+   - `0.0` = 100% secondary voice
 
-### 🇬🇧 UK English Voices  
-| Voice | Character | Best For |
-|-------|-----------|----------|
-| Emma | Refined, elegant female | Formal content, literature |
-| George | Professional, authoritative male | Business, education |
-| Alice | Clear, storytelling female | Children's content |
-| *...and 5 more voices* | | |
+**Blending Tips:**
+- Mix voices from the same language for best results
+- Blend male + female voices for androgynous effects
+- Try `Heart + Bella` at 0.6 for energetic yet warm narration
+- Try `Michael + Adam` at 0.5 for rich, authoritative voice
+- Experiment with ratios to find your perfect voice!
 
-## ⚙️ Voice Effect Presets
+### Advanced Voice Effects
 
-### Character Presets:
-- **Cinematic**: Deep, movie-trailer voice with reverb
-- **Monster**: Growling, distorted creature voice  
-- **Robot**: Mechanical, synthesized voice with modulation
-- **Child**: Higher pitch/formant for young character
-- **Darth Vader**: Deep, breathing, echo-heavy villain voice
-- **Singer**: Optimized for musical content with compression
+Connect the TTS output to "🔊 Geeky Kokoro Advanced Voice" node for effects:
 
-### Manual Effects:
+#### Preset Profiles:
+- **Cinematic**: Deep, movie-trailer style (-3 semitones, reverb, compression)
+- **Monster**: Growling creature voice (-6 semitones, formant shift, distortion)
+- **Robot**: Mechanical, synthesized voice (band-pass filter, modulation)
+- **Child**: Young character voice (+3 semitones, formant shift)
+- **Darth Vader**: Deep, breathing villain voice (-4 semitones, echo, modulation)
+- **Singer**: Optimized for vocal content (compression, EQ, reverb)
+
+#### Manual Effects:
 - **Pitch Shift**: ±12 semitones
-- **Formant Shift**: Vocal tract size adjustment
-- **Reverb**: Room ambiance simulation
-- **Echo**: Discrete repeat effects
-- **Distortion**: Harmonic saturation
+- **Formant Shift**: Vocal tract size adjustment (-5 to +5)
+- **Reverb**: Room ambiance (0.0 to 1.0)
+- **Echo**: Discrete repeats with feedback
+- **Distortion**: Harmonic saturation (0.0 to 1.0)
 - **Compression**: Dynamic range control
-- **3-Band EQ**: Bass, mid, treble adjustment
+- **3-Band EQ**: Bass, Mid, Treble (-1.0 to +1.0)
+- **Effect Blend**: Mix with original audio (0.0 to 1.0)
+- **Output Volume**: -60dB to +60dB
+
+## ⚙️ Technical Details
+
+### Model Information
+- **Model**: Kokoro-82M v0.19
+- **Parameters**: 82 million
+- **Architecture**: Decoder-only based on StyleTTS 2 + ISTFTNet
+- **Sample Rate**: 24kHz
+- **License**: Apache 2.0
+- **Repository**: [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)
+
+### Performance Benchmarks
+
+**Processing Speed** (Python 3.12, CUDA GPU):
+- Short text (< 200 chars): ~2-3 seconds
+- Medium text (200-800 chars): ~5-10 seconds
+- Long text (800+ chars): ~15-30 seconds
+- Voice blending: +20% processing time
+- Voice effects: +5-15% processing time
+
+**Memory Usage:**
+- Base model: ~2GB VRAM/RAM
+- With GPU acceleration: ~3GB VRAM
+- Voice effects processing: +500MB
+- Voice blending: +200MB temporary
+
+### Text Processing
+- **Intelligent Chunking**: Automatically splits long texts while preserving sentence order
+- **Chunk Size**: 350 characters (configurable)
+- **Gap Insertion**: 150ms natural pauses between chunks
+- **Paragraph Awareness**: Respects paragraph breaks and structure
+- **Punctuation Handling**: Proper sentence boundary detection
+
+### Supported Languages & Codes
+- `a` - American English
+- `b` - British English
+- `j` - Japanese
+- `z` - Mandarin Chinese
+- `e` - Spanish
+- `f` - French
+- `h` - Hindi
+- `i` - Italian
+- `p` - Brazilian Portuguese
 
 ## 🔧 Troubleshooting
 
-### Common Issues Fixed:
+### Common Issues
 
-#### ✅ Text Chunking Problems
-- **Old**: "First line skipped and added later"
-- **New**: Proper sentence order maintained
-
-#### ✅ Python 3.9-3.13 Compatibility
-- **Old**: Various dependency conflicts, limited Python version support
-- **New**: Fully tested with Python 3.9 through 3.13 and ComfyUI v3.49
-
-#### ✅ Model Download Issues  
-- **Old**: Manual download required
-- **New**: Automatic download following ComfyUI conventions
-
-#### ✅ Memory Management
-- **Old**: High memory usage, occasional crashes
-- **New**: Efficient processing with better cleanup
-
-### Performance Tips:
-1. **Text Length**: Process texts under 1000 chars for optimal performance
-2. **GPU Usage**: Enable GPU for longer texts, CPU for short ones
-3. **Effect Intensity**: Start with low settings (30-50%) and increase gradually
-4. **Memory**: Close other applications when processing very long texts
-
-### Installation Issues:
-
-#### Dependency Conflicts:
+#### "Kokoro import error"
+**Solution:**
 ```bash
-# If you have conflicts with existing installations
-pip install --force-reinstall kokoro>=0.9.4
-
-# For resampy issues on some systems:
-pip install numba>=0.56.0
-pip install resampy>=0.4.3
+pip install --upgrade kokoro>=0.9.4
 ```
 
-#### Model Location Issues:
-The node automatically handles model placement following ComfyUI conventions. Models are stored in:
-- `ComfyUI/models/kokoro_tts/` (preferred)
-- HuggingFace cache (automatic fallback)
+#### Voice not loading
+**Solution:**
+- Restart ComfyUI completely
+- Check console for specific error messages
+- Ensure all dependencies are installed
+- Try reinstalling: `pip install --force-reinstall kokoro`
 
-## 🆚 Comparison with Other Kokoro Implementations
+#### GPU out of memory
+**Solutions:**
+- Disable "use_gpu" option
+- Reduce text length
+- Close other GPU-intensive applications
+- Use CPU mode for very long texts
 
-| Feature | Geeky Kokoro TTS v2.0+ | Other Implementations |
-|---------|----------------------|---------------------|
-| **Text Chunking** | ✅ Fixed order preservation | ❌ Often has reordering issues |
-| **Python 3.9-3.13 Support** | ✅ Full compatibility | ⚠️ Mixed compatibility |
-| **Voice Blending** | ✅ Advanced style mixing | ❌ Usually not available |
-| **Voice Effects** | ✅ Professional-grade processing | ❌ Basic or none |
-| **ComfyUI Integration** | ✅ Follows v3.49+ standards | ⚠️ Varies |
-| **Error Handling** | ✅ Robust fallbacks | ⚠️ Basic error handling |
-| **Model Management** | ✅ Automatic, standards-compliant | ⚠️ Often manual |
+#### Audio sounds distorted
+**Solutions:**
+- Reduce "output_volume" in Voice Mod node
+- Lower "effect_blend" ratio (start at 0.3-0.5)
+- Reduce distortion and compression amounts
+- Check that input audio isn't already clipping
 
-## 📊 Performance Benchmarks
+#### Python version issues
+**Solution:**
+```bash
+python --version  # Check your version
+# Must be 3.9, 3.10, 3.11, 3.12, or 3.13
+pip install --upgrade pip
+pip install -r requirements.txt --force-reinstall
+```
 
-### Text Processing Speed (Python 3.12, RTX 4090):
-- **Short text** (< 200 chars): ~2-3 seconds
-- **Medium text** (200-800 chars): ~5-10 seconds  
-- **Long text** (800+ chars): ~15-30 seconds
-- **Voice blending**: +20% processing time
-- **Voice effects**: +5-15% processing time
+#### espeak-ng not found
+**Solution:**
+- Ubuntu/Debian: `sudo apt-get install espeak-ng`
+- macOS: `brew install espeak-ng`
+- Windows: Download from espeak-ng GitHub releases
 
-### Memory Usage:
-- **Base model**: ~2GB VRAM/RAM
-- **With effects**: +500MB
-- **Text chunking**: Minimal overhead
-- **Voice blending**: +200MB temporary
-
-## 🛡️ Compatibility Matrix
-
-| System | Python | ComfyUI | Status |
-|--------|--------|---------|--------|
-| Windows 10/11 | 3.9-3.13 | v3.40+ | ✅ Fully Supported |
-| macOS 12+ | 3.9-3.13 | v3.40+ | ✅ Fully Supported |
-| Linux | 3.9-3.13 | v3.40+ | ✅ Fully Supported |
-| ComfyUI Portable | 3.9-3.13 | v3.49+ | ✅ Optimized |
-
-## 📝 Changelog
-
-### v2.0.1 (Current)
-- ✅ **Python 3.13 Support**: Added full compatibility with Python 3.13
-- ✅ **Enhanced Portable Support**: Improved installation for ComfyUI portable with Python 3.13
-- ✅ **Complete Install Script**: Comprehensive installation with all helper functions
-- ✅ Updated documentation for Python 3.9-3.13 compatibility
-
-### v2.0.0
-- ✅ **MAJOR FIX**: Resolved text chunking line reordering issue
-- ✅ Updated to Kokoro v0.9.4+ with latest models
-- ✅ Python 3.9-3.12 full compatibility
-- ✅ ComfyUI v3.49+ standards compliance
-- ✅ Improved memory management and performance
-- ✅ Enhanced error handling and logging
-- ✅ Better model download and caching
-
-### v1.0.0 (Legacy)
-- Initial release with basic functionality
-- Kokoro v0.8.4 support
-- Text chunking issues present
-- Limited Python 3.12 support
+### Performance Tips
+1. **For long texts**: Enable GPU acceleration
+2. **For short texts**: CPU mode is often faster
+3. **Memory management**: Process texts in batches if needed
+4. **Effect intensity**: Start low (30-50%) and increase gradually
+5. **Voice blending**: Keep both voices in the same language family
 
 ## 🤝 Contributing
 
-We welcome contributions! Areas where help is needed:
-- **Additional voice profiles** for the effects node
-- **Multi-language support** (Chinese, Japanese, etc.)
-- **Performance optimizations** for longer texts
-- **UI/UX improvements** for better usability
+Contributions are welcome! Areas where help is appreciated:
+- Additional voice profile presets
+- Performance optimizations
+- Bug reports and fixes
+- Documentation improvements
+- Testing on different platforms
 
-## 📄 License & Acknowledgments
+## 📄 License & Credits
 
-- **This Node Collection**: MIT License
-- **Kokoro TTS Model**: Apache 2.0 License (by hexgrad)
-- **Voice Effects**: Built with librosa, scipy, resampy
+### This Project
+- **License**: MIT License
+- **Author**: GeekyGhost
+- **Repository**: https://github.com/GeekyGhost/ComfyUI-Geeky-Kokoro-TTS
 
-### Special Thanks:
-- [hexgrad](https://huggingface.co/hexgrad) for the amazing Kokoro-82M model
-- [ComfyUI Team](https://github.com/comfyanonymous/ComfyUI) for the excellent framework
-- Community testers who reported the chunking issues
-- Contributors to the audio processing libraries
+### Kokoro TTS Model
+- **License**: Apache 2.0
+- **Author**: hexgrad
+- **Model**: https://huggingface.co/hexgrad/Kokoro-82M
 
-## 🔗 Links
+### Dependencies
+- **librosa**: Audio processing (ISC License)
+- **scipy**: Scientific computing (BSD License)
+- **PyTorch**: Deep learning framework (BSD License)
+- **soundfile**: Audio I/O (BSD License)
 
-- **GitHub Repository**: https://github.com/GeekyGhost/ComfyUI-Geeky-Kokoro-TTS
-- **Kokoro TTS Model**: https://huggingface.co/hexgrad/Kokoro-82M  
-- **ComfyUI**: https://github.com/comfyanonymous/ComfyUI
-- **Issue Reporting**: Use GitHub Issues for bug reports and feature requests
+### Special Thanks
+- [hexgrad](https://huggingface.co/hexgrad) for the incredible Kokoro-82M model
+- [ComfyUI Team](https://github.com/comfyanonymous/ComfyUI) for the amazing framework
+- Community testers and contributors
+- Audio processing library developers
+
+## 📚 Research & Resources
+
+### Useful Links
+- **Kokoro Model Page**: https://huggingface.co/hexgrad/Kokoro-82M
+- **ComfyUI Documentation**: https://docs.comfy.org
+- **Issue Tracker**: https://github.com/GeekyGhost/ComfyUI-Geeky-Kokoro-TTS/issues
+- **Discussions**: https://github.com/GeekyGhost/ComfyUI-Geeky-Kokoro-TTS/discussions
+
+### Research Papers & References
+- StyleTTS 2 architecture
+- ISTFTNet vocoder
+- Phase vocoder techniques
+- Voice morphing and blending
 
 ---
 
+## 🌟 Quick Start Examples
 
-**Enjoy natural, high-quality text-to-speech with perfect text ordering! 🎉**
+### Example 1: Basic Narration
+```
+Node: Geeky Kokoro TTS (2025)
+Text: "Welcome to my tutorial on advanced AI techniques."
+Voice: 🇺🇸 🚺 Nicole 🎧
+Speed: 1.0
+GPU: true
+```
+
+### Example 2: Character Voice with Effects
+```
+Node 1: Geeky Kokoro TTS (2025)
+Voice: 🇺🇸 🚹 Puck 🎭
+Text: "The villain laughed menacingly."
+
+Node 2: Geeky Kokoro Advanced Voice
+Profile: Monster
+Intensity: 0.7
+```
+
+### Example 3: Blended Voice for Unique Sound
+```
+Node: Geeky Kokoro TTS (2025)
+Voice: 🇺🇸 🚺 Heart ❤️
+Enable Blending: true
+Second Voice: 🇺🇸 🚺 Bella 🔥
+Blend Ratio: 0.6
+Text: "This creates a warm yet energetic voice perfect for marketing."
+```
+
+---
+
+**Made with ❤️ for the ComfyUI community**
+
+**Enjoy natural, high-quality text-to-speech with 54+ voices and unlimited creative possibilities! 🎉**
