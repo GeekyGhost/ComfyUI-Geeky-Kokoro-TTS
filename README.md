@@ -1,13 +1,13 @@
 # 🔊 Geeky Kokoro TTS and Voice Mod for ComfyUI (Updated 2025)
 
-A powerful and feature-rich custom node collection for ComfyUI that integrates the **latest Kokoro TTS v0.19+ system** with advanced voice modification capabilities. This updated version features **improved text chunking**, **Python 3.12 and below compatibility**, and follows **ComfyUI v3.49+ guidelines**.
+A powerful and feature-rich custom node collection for ComfyUI that integrates the **latest Kokoro TTS v0.19+ system** with advanced voice modification capabilities. This updated version features **improved text chunking**, **Python 3.9-3.13 compatibility**, and follows **ComfyUI v3.49+ guidelines**.
 
 ## 🆕 What's New in v2.0
 
 ### Major Fixes & Improvements:
 - **🔧 Fixed Text Chunking Bug**: Resolved the issue where first lines were skipped and inserted later in paragraphs
 - **📱 Modern Kokoro Integration**: Updated to Kokoro v0.9.4+ with latest model (hexgrad/Kokoro-82M)
-- **🐍 Python 3.12+ Compatibility**: Fully tested with ComfyUI portable v3.49 and Python 3.12
+- **🐍 Python 3.9-3.13 Compatibility**: Fully tested with ComfyUI portable v3.49 and Python 3.9 through 3.13
 - **📁 ComfyUI Standards**: Follows modern ComfyUI model management and directory conventions
 - **⚡ Improved Performance**: Better memory usage and processing speed
 - **🛡️ Enhanced Error Handling**: More robust fallbacks and informative error messages
@@ -41,7 +41,7 @@ A powerful and feature-rich custom node collection for ComfyUI that integrates t
 
 ### Prerequisites
 - **ComfyUI v3.49+** (fully supported)
-- **Python 3.9 to 3.14** (3.12+ recommended)
+- **Python 3.9 to 3.13** (3.12+ recommended)
 - **PyTorch 2.0+** (included with ComfyUI)
 
 ### Quick Installation (Recommended)
@@ -190,9 +190,9 @@ Output: [skips Line 1] "Line 2. Line 3. Line 1 Line 4."
 - **Old**: "First line skipped and added later"
 - **New**: Proper sentence order maintained
 
-#### ✅ Python 3.12 Compatibility
-- **Old**: Various dependency conflicts
-- **New**: Fully tested with Python 3.12+ and ComfyUI v3.49
+#### ✅ Python 3.9-3.13 Compatibility
+- **Old**: Various dependency conflicts, limited Python version support
+- **New**: Fully tested with Python 3.9 through 3.13 and ComfyUI v3.49
 
 #### ✅ Model Download Issues  
 - **Old**: Manual download required
@@ -227,10 +227,10 @@ The node automatically handles model placement following ComfyUI conventions. Mo
 
 ## 🆚 Comparison with Other Kokoro Implementations
 
-| Feature | Geeky Kokoro TTS v2.0 | Other Implementations |
+| Feature | Geeky Kokoro TTS v2.0+ | Other Implementations |
 |---------|----------------------|---------------------|
 | **Text Chunking** | ✅ Fixed order preservation | ❌ Often has reordering issues |
-| **Python 3.12 Support** | ✅ Full compatibility | ⚠️ Mixed compatibility |
+| **Python 3.9-3.13 Support** | ✅ Full compatibility | ⚠️ Mixed compatibility |
 | **Voice Blending** | ✅ Advanced style mixing | ❌ Usually not available |
 | **Voice Effects** | ✅ Professional-grade processing | ❌ Basic or none |
 | **ComfyUI Integration** | ✅ Follows v3.49+ standards | ⚠️ Varies |
@@ -256,17 +256,23 @@ The node automatically handles model placement following ComfyUI conventions. Mo
 
 | System | Python | ComfyUI | Status |
 |--------|--------|---------|--------|
-| Windows 10/11 | 3.9-3.14 | v3.40+ | ✅ Fully Supported |
-| macOS 12+ | 3.9-3.14 | v3.40+ | ✅ Fully Supported |
-| Linux | 3.9-3.14 | v3.40+ | ✅ Fully Supported |
-| ComfyUI Portable | 3.11+ | v3.49+ | ✅ Optimized |
+| Windows 10/11 | 3.9-3.13 | v3.40+ | ✅ Fully Supported |
+| macOS 12+ | 3.9-3.13 | v3.40+ | ✅ Fully Supported |
+| Linux | 3.9-3.13 | v3.40+ | ✅ Fully Supported |
+| ComfyUI Portable | 3.9-3.13 | v3.49+ | ✅ Optimized |
 
 ## 📝 Changelog
 
-### v2.0.0 (Current)
+### v2.0.1 (Current)
+- ✅ **Python 3.13 Support**: Added full compatibility with Python 3.13
+- ✅ **Enhanced Portable Support**: Improved installation for ComfyUI portable with Python 3.13
+- ✅ **Complete Install Script**: Comprehensive installation with all helper functions
+- ✅ Updated documentation for Python 3.9-3.13 compatibility
+
+### v2.0.0
 - ✅ **MAJOR FIX**: Resolved text chunking line reordering issue
-- ✅ Updated to Kokoro v0.9.4+ with latest models  
-- ✅ Python 3.12+ full compatibility
+- ✅ Updated to Kokoro v0.9.4+ with latest models
+- ✅ Python 3.9-3.12 full compatibility
 - ✅ ComfyUI v3.49+ standards compliance
 - ✅ Improved memory management and performance
 - ✅ Enhanced error handling and logging
