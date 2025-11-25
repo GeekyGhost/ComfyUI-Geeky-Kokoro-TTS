@@ -1,4 +1,4 @@
-# 🔊 Geeky Kokoro TTS for ComfyUI - 2025 Edition
+# 🔊 Geeky Kokoro TTS for ComfyUI - 2025 Edition (Does not work with python 3.13)
 
 **The most comprehensive Kokoro TTS implementation for ComfyUI** with ALL 54+ voices across 9 languages, voice blending, and advanced voice modification effects.
 
@@ -457,4 +457,5 @@ Text: "This creates a warm yet energetic voice perfect for marketing."
 **Made with ❤️ for the ComfyUI community**
 
 **Enjoy natural, high-quality text-to-speech with 54+ voices and unlimited creative possibilities! 🎉**
+
 
