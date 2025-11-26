@@ -9,6 +9,8 @@
 
 ## 🌟 What's New in 2025 Edition
 
+Special Note: Advanced Voice Mod node currently under construction. Will not function as intended at the moment. Japanese voices do not work at the moment either, will require custom wheel. 
+
 ### Complete Rewrite from Ground Up
 - **🌍 54+ Voices**: Complete support for all Kokoro-82M voices across 9 languages
 - **🎯 9 Languages**: US English, UK English, Japanese (not working yet, needs a custom wheel build), Mandarin Chinese, Spanish, French, Hindi, Italian, Brazilian Portuguese
@@ -608,6 +610,7 @@ Text: "This creates a warm yet energetic voice perfect for marketing."
 **Made with ❤️ for the ComfyUI community**
 
 **Enjoy natural, high-quality text-to-speech with 54+ voices and unlimited creative possibilities! 🎉**
+
 
 
 
