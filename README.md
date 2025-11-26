@@ -13,7 +13,7 @@
 - **🌍 54+ Voices**: Complete support for all Kokoro-82M voices across 9 languages
 - **🎯 9 Languages**: US English, UK English, Japanese (not working yet, needs a custom wheel build), Mandarin Chinese, Spanish, French, Hindi, Italian, Brazilian Portuguese
 - **🔀 Advanced Voice Blending**: Mix any two voices with adjustable blend ratios
-- **🐍 Python 3.12 & 3.13**: Fully tested and optimized for the latest Python versions
+- **🐍 Python 3.12: Fully tested and optimized for the latest Python versions
 - **📦 Modern Architecture**: Completely rewritten following 2025 ComfyUI best practices
 - **⚡ Improved Performance**: Better memory management and processing speed
 - **🛡️ Enhanced Reliability**: Robust error handling and fallback mechanisms
@@ -608,5 +608,6 @@ Text: "This creates a warm yet energetic voice perfect for marketing."
 **Made with ❤️ for the ComfyUI community**
 
 **Enjoy natural, high-quality text-to-speech with 54+ voices and unlimited creative possibilities! 🎉**
+
 
 
