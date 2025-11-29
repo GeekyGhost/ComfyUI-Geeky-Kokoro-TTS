@@ -9,6 +9,8 @@
 
 ## 🌟 What's New in 2025 Edition
 
+Ignore the Advanced Voice Mod node for now, it's an experimental thing currently.
+
 Special Note: Advanced Voice Mod node currently under construction. Will not function as intended at the moment. Japanese voices do not work at the moment either, will require custom wheel. 
 
 ### Complete Rewrite from Ground Up
@@ -610,6 +612,7 @@ Text: "This creates a warm yet energetic voice perfect for marketing."
 **Made with ❤️ for the ComfyUI community**
 
 **Enjoy natural, high-quality text-to-speech with 54+ voices and unlimited creative possibilities! 🎉**
+
 
 
 
