@@ -164,7 +164,7 @@ Download and install from: https://github.com/espeak-ng/espeak-ng/releases
 | Lewis | `bm_lewis` | Reliable, clear, articulate | Training, documentation, instructional content |
 | Daniel | `bm_daniel` | Modern, professional, versatile | General purpose, business, presentations |
 
-### 🇯🇵 Japanese Voices (5 voices)
+### 🇯🇵 Japanese Voices (5 voices) - Not Working, needs custom wheel
 
 | Voice Name | Code | Gender | Character | Best For |
 |------------|------|--------|-----------|----------|
@@ -612,6 +612,7 @@ Text: "This creates a warm yet energetic voice perfect for marketing."
 **Made with ❤️ for the ComfyUI community**
 
 **Enjoy natural, high-quality text-to-speech with 54+ voices and unlimited creative possibilities! 🎉**
+
 
 
 
