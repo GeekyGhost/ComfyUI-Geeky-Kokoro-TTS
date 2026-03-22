@@ -336,7 +336,7 @@ class GeekyKokoroTTSNode:
                     parts = re.split(r'([,;])', current_chunk)
                     temp_chunk = ""
 
-                    for j in range(0, len(parts)-1, 2):
+                    for j in range(0, len(parts), 2):
                         part = parts[j] + (parts[j+1] if j+1 < len(parts) else '')
 
                         if temp_chunk and len(temp_chunk + part) > max_chunk_size:
@@ -386,27 +386,34 @@ class GeekyKokoroTTSNode:
                     logger.warning(f"No phonemes generated for chunk {i+1}")
                     continue
 
-                _, ps, _ = phoneme_sequences[0]
+                chunk_parts = []
+                
+                for _, ps, _ in phoneme_sequences:
+                    if not ps: 
+                        continue
+                        
+                    ref_s_chunk = ref_s if ref_s is not None else pipeline.load_voice(voice_code)[len(ps)-1]
 
-                ref_s_chunk = ref_s if ref_s is not None else pipeline.load_voice(voice_code)[len(ps)-1]
+                    with self.MODEL_LOCK:
+                        if use_gpu and True not in self.MODEL and torch.cuda.is_available():
+                            try:
+                                self.MODEL[True] = KModel().to('cuda').eval()
+                            except Exception as gpu_e:
+                                logger.warning(f"Failed to load GPU model: {gpu_e}. Using CPU.")
+                                use_gpu = False
 
-                with self.MODEL_LOCK:
-                    if use_gpu and True not in self.MODEL and torch.cuda.is_available():
                         try:
-                            self.MODEL[True] = KModel().to('cuda').eval()
-                        except Exception as gpu_e:
-                            logger.warning(f"Failed to load GPU model: {gpu_e}. Using CPU.")
+                            audio = self.MODEL[use_gpu and True in self.MODEL](ps, ref_s_chunk, speed)
+                        except Exception as gen_e:
+                            logger.warning(f"GPU generation failed for chunk {i+1}: {gen_e}. Trying CPU.")
                             use_gpu = False
+                            audio = self.MODEL[False](ps, ref_s_chunk, speed)
 
-                    try:
-                        audio = self.MODEL[use_gpu and True in self.MODEL](ps, ref_s_chunk, speed)
-                    except Exception as gen_e:
-                        logger.warning(f"GPU generation failed for chunk {i+1}: {gen_e}. Trying CPU.")
-                        use_gpu = False
-                        audio = self.MODEL[False](ps, ref_s_chunk, speed)
-
-                audio_np = audio.cpu().numpy() if isinstance(audio, torch.Tensor) else audio
-                all_audio.append(audio_np)
+                    audio_np = audio.cpu().numpy() if isinstance(audio, torch.Tensor) else audio
+                    chunk_parts.append(audio_np)
+                
+                if chunk_parts:
+                    all_audio.append(np.concatenate(chunk_parts))
 
             except Exception as e:
                 logger.error(f"Failed to process chunk {i+1}: {e}")
